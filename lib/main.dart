@@ -2217,7 +2217,14 @@ Future<String> effectiveTelethonBaseUrl(String mediaBaseUrl) async {
       .get();
   final data = doc.data() ?? {};
   final remote = (data['ingestBaseUrl'] ?? '').toString().trim();
-  if (remote.isNotEmpty) return remote;
+  final status = (data['status'] ?? '').toString().trim().toLowerCase();
+  final expiresAt = data['expiresAt'];
+  final expiresAtDate = expiresAt is Timestamp ? expiresAt.toDate() : null;
+  final remoteIsUsable =
+      remote.isNotEmpty &&
+      status != 'stopped' &&
+      (expiresAtDate == null || expiresAtDate.isAfter(DateTime.now()));
+  if (remoteIsUsable) return remote;
 
   final apiId = data['apiId'] is int
       ? data['apiId'] as int
