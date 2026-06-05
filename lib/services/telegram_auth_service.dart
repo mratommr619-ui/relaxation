@@ -9,11 +9,13 @@ import 'local_telethon_service.dart';
 class TelegramAuthState {
   const TelegramAuthState({
     required this.authorized,
+    this.accountId = '',
     this.displayName = '',
     this.phone = '',
   });
 
   final bool authorized;
+  final String accountId;
   final String displayName;
   final String phone;
 }
@@ -41,6 +43,7 @@ class TelegramAuthService {
       final state = await AndroidTelethonService.instance.status();
       return TelegramAuthState(
         authorized: state.authorized,
+        accountId: state.accountId,
         displayName: state.displayName,
         phone: state.phone,
       );
@@ -61,6 +64,7 @@ class TelegramAuthService {
       if (authorized) await _saveSession(data);
       return TelegramAuthState(
         authorized: authorized,
+        accountId: (data['id'] ?? '').toString(),
         displayName: _displayName(data),
         phone: (data['phone'] ?? '').toString(),
       );

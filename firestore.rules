@@ -39,11 +39,19 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.resource.data.deviceHash == deviceHash;
       allow update: if signedIn() &&
-        resource.data.deviceHash == deviceHash &&
         (
           isAdmin() ||
-          request.auth.uid in resource.data.linkedUids ||
-          request.auth.uid in request.resource.data.linkedUids
+          (
+            resource.data.deviceHash == deviceHash &&
+            (
+              request.auth.uid in resource.data.linkedUids ||
+              request.auth.uid in request.resource.data.linkedUids
+            )
+          ) ||
+          (
+            request.resource.data.disabled == true &&
+            request.resource.data.disabledReason is string
+          )
         );
       allow list, delete: if isAdmin();
     }
@@ -51,6 +59,18 @@ service cloud.firestore {
     match /user_access/{uid} {
       allow get, create, update: if signedIn() && request.auth.uid == uid;
       allow list, delete: if isAdmin();
+    }
+
+    match /telegram_accounts/{accountId} {
+      allow get, create, update: if signedIn();
+      allow list, delete: if isAdmin();
+
+      match /devices/{deviceHash} {
+        allow get, create, update: if signedIn() &&
+          request.resource.data.uid == request.auth.uid;
+        allow list, update: if signedIn();
+        allow delete: if isAdmin();
+      }
     }
 
     match /license_keys/{key} {

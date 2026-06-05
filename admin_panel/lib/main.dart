@@ -95,6 +95,7 @@ class _StudioHomeState extends State<StudioHome> {
   String _type = 'movie';
   String? _editingMediaId;
   String? _editingAdId;
+  List<String> _selectedGenres = ['Action'];
   bool _saving = false;
 
   void _openSection(_AdminSection section) {
@@ -125,11 +126,13 @@ class _StudioHomeState extends State<StudioHome> {
         final editor = _EditorCard(
           formKey: _formKey,
           title: _title,
-          genre: _genre,
+          selectedGenres: _selectedGenres,
           quality: _quality,
           description: _description,
           posterBase64: _posterBase64,
           telegramUrl: _telegramUrl,
+          watchLinks: _watchLinks,
+          downloadLinks: _downloadLinks,
           episodesText: _episodesText,
           type: _type,
           saving: _saving,
@@ -137,6 +140,20 @@ class _StudioHomeState extends State<StudioHome> {
           firebaseReady: widget.firebaseReady,
           onTypeChanged: (value) {
             _changeMediaType(value);
+            refreshPage(() {});
+          },
+          onAddGenre: (value) {
+            final genre = value.trim();
+            if (genre.isEmpty || _selectedGenres.contains(genre)) return;
+            setState(() => _selectedGenres = [..._selectedGenres, genre]);
+            refreshPage(() {});
+          },
+          onRemoveGenre: (value) {
+            setState(() {
+              _selectedGenres = _selectedGenres
+                  .where((genre) => genre != value)
+                  .toList();
+            });
             refreshPage(() {});
           },
           onApplyTelegramLink: () => _applyTelegramLink(),
@@ -299,7 +316,8 @@ class _StudioHomeState extends State<StudioHome> {
       final payload = {
         'title': _title.text.trim(),
         'type': _type,
-        'genre': _genre.text.trim(),
+        'genre': _selectedGenres.isEmpty ? 'General' : _selectedGenres.first,
+        'genres': _selectedGenres.isEmpty ? ['General'] : _selectedGenres,
         'quality': _quality.text.trim(),
         'description': _description.text.trim(),
         'posterUrl': _posterUrl.text.trim(),
@@ -341,6 +359,7 @@ class _StudioHomeState extends State<StudioHome> {
     setState(() {
       _editingMediaId = null;
       _type = 'movie';
+      _selectedGenres = ['Action'];
       _title.clear();
       _genre.text = 'Action';
       _quality.text = '1080p';
@@ -397,7 +416,8 @@ class _StudioHomeState extends State<StudioHome> {
       _type = (data['type'] ?? 'movie').toString() == 'series'
           ? 'series'
           : 'movie';
-      _genre.text = (data['genre'] ?? '').toString();
+      _selectedGenres = _genresFromData(data['genres'], data['genre']);
+      _genre.text = _selectedGenres.join(', ');
       _quality.text = (data['quality'] ?? '').toString();
       _description.text = (data['description'] ?? '').toString();
       _posterUrl.text = (data['posterUrl'] ?? '').toString();
@@ -430,6 +450,23 @@ class _StudioHomeState extends State<StudioHome> {
     return (fallback ?? '').toString();
   }
 
+  List<String> _genresFromData(dynamic value, dynamic fallback) {
+    final genres = <String>[];
+    if (value is List) {
+      for (final entry in value) {
+        final genre = entry.toString().trim();
+        if (genre.isNotEmpty && !genres.contains(genre)) genres.add(genre);
+      }
+    }
+    if (genres.isEmpty) {
+      for (final part in (fallback ?? '').toString().split(',')) {
+        final genre = part.trim();
+        if (genre.isNotEmpty && !genres.contains(genre)) genres.add(genre);
+      }
+    }
+    return genres.isEmpty ? ['General'] : genres;
+  }
+
   List<Map<String, dynamic>> _episodesFromText(String text) {
     final episodes = <Map<String, dynamic>>[];
     for (final rawLine in text.split('\n')) {
@@ -439,14 +476,20 @@ class _StudioHomeState extends State<StudioHome> {
       final label = parts.length > 1 && parts.first.isNotEmpty
           ? parts.first
           : 'Episode ${episodes.length + 1}';
-      final telegramUrl = parts.length > 1
-          ? parts.sublist(1).join('|')
-          : parts.first;
+      final cleanUrls = (parts.length > 1 ? parts.sublist(1) : [parts.first])
+          .map((url) => url.trim())
+          .where((url) => url.isNotEmpty)
+          .toList();
+      if (cleanUrls.isEmpty) continue;
+      final telegramUrl = cleanUrls.firstWhere(
+        (url) => parseTelegramPublicLink(url) != null,
+        orElse: () => '',
+      );
       episodes.add({
         'label': label,
         'telegramUrl': telegramUrl,
-        'watchLinks': <Map<String, dynamic>>[],
-        'downloadLinks': <Map<String, dynamic>>[],
+        'watchLinks': _serverLinksFromText(cleanUrls.join('\n')),
+        'downloadLinks': _serverLinksFromText(cleanUrls.join('\n')),
       });
     }
     return episodes;
@@ -458,10 +501,10 @@ class _StudioHomeState extends State<StudioHome> {
     for (final entry in value) {
       if (entry is! Map) continue;
       final label = (entry['label'] ?? '').toString();
-      final telegramUrl = (entry['telegramUrl'] ?? '').toString();
-      if (telegramUrl.isNotEmpty) {
+      final links = _linksToText(entry['watchLinks'], entry['telegramUrl']);
+      if (links.isNotEmpty) {
         lines.add(
-          '${label.isEmpty ? 'Episode ${lines.length + 1}' : label} | $telegramUrl',
+          '${label.isEmpty ? 'Episode ${lines.length + 1}' : label} | ${links.split('\n').join(' | ')}',
         );
       }
     }
@@ -1649,9 +1692,11 @@ class _EpisodeListEditorState extends State<_EpisodeListEditor> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: episode.url,
+                          minLines: 1,
+                          maxLines: 3,
                           decoration: const InputDecoration(
-                            labelText: 'Telegram post link',
-                            hintText: 'https://t.me/channel/123',
+                            labelText: 'Episode links',
+                            hintText: 'One Telegram/direct link per line',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -1695,10 +1740,16 @@ class _EpisodeListEditorState extends State<_EpisodeListEditor> {
       final episode = _episodes[index];
       final url = episode.url.text.trim();
       if (url.isEmpty) continue;
+      final urls = url
+          .split(RegExp(r'[\n,]+'))
+          .map((entry) => entry.trim())
+          .where((entry) => entry.isNotEmpty)
+          .toList();
+      if (urls.isEmpty) continue;
       final label = episode.label.text.trim().isEmpty
           ? 'Episode ${index + 1}'
           : episode.label.text.trim();
-      lines.add('$label | $url');
+      lines.add('$label | ${urls.join(' | ')}');
     }
     widget.controller.text = lines.join('\n');
   }
@@ -1712,7 +1763,7 @@ class _EpisodeListEditorState extends State<_EpisodeListEditor> {
       final label = parts.length > 1 && parts.first.isNotEmpty
           ? parts.first
           : 'Episode ${drafts.length + 1}';
-      final url = parts.length > 1 ? parts.sublist(1).join('|') : parts.first;
+      final url = parts.length > 1 ? parts.sublist(1).join('\n') : parts.first;
       drafts.add(_EpisodeDraft(label: label, url: url));
     }
     return drafts;
@@ -2114,17 +2165,21 @@ class _EditorCard extends StatelessWidget {
   const _EditorCard({
     required this.formKey,
     required this.title,
-    required this.genre,
+    required this.selectedGenres,
     required this.quality,
     required this.description,
     required this.posterBase64,
     required this.telegramUrl,
+    required this.watchLinks,
+    required this.downloadLinks,
     required this.episodesText,
     required this.type,
     required this.saving,
     required this.editing,
     required this.firebaseReady,
     required this.onTypeChanged,
+    required this.onAddGenre,
+    required this.onRemoveGenre,
     required this.onApplyTelegramLink,
     required this.onSave,
     required this.onCancelEdit,
@@ -2133,17 +2188,21 @@ class _EditorCard extends StatelessWidget {
 
   final GlobalKey<FormState> formKey;
   final TextEditingController title;
-  final TextEditingController genre;
+  final List<String> selectedGenres;
   final TextEditingController quality;
   final TextEditingController description;
   final TextEditingController posterBase64;
   final TextEditingController telegramUrl;
+  final TextEditingController watchLinks;
+  final TextEditingController downloadLinks;
   final TextEditingController episodesText;
   final String type;
   final bool saving;
   final bool editing;
   final bool firebaseReady;
   final ValueChanged<String> onTypeChanged;
+  final ValueChanged<String> onAddGenre;
+  final ValueChanged<String> onRemoveGenre;
   final VoidCallback onApplyTelegramLink;
   final VoidCallback onSave;
   final VoidCallback onCancelEdit;
@@ -2192,12 +2251,12 @@ class _EditorCard extends StatelessWidget {
               onSelectionChanged: (value) => onTypeChanged(value.first),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _field(genre, 'Genre')),
-                const SizedBox(width: 12),
-                Expanded(child: _field(quality, 'Quality')),
-              ],
+            Row(children: [Expanded(child: _field(quality, 'Quality'))]),
+            const SizedBox(height: 12),
+            _GenreMultiPicker(
+              selectedGenres: selectedGenres,
+              onAdd: onAddGenre,
+              onRemove: onRemoveGenre,
             ),
             const SizedBox(height: 12),
             _field(description, 'Description', maxLines: 3),
@@ -2213,7 +2272,7 @@ class _EditorCard extends StatelessWidget {
                 key: ValueKey(episodesText.text.hashCode),
                 controller: episodesText,
               )
-            else
+            else ...[
               TextFormField(
                 controller: telegramUrl,
                 decoration: InputDecoration(
@@ -2227,6 +2286,19 @@ class _EditorCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              _field(
+                watchLinks,
+                'Extra watch links (one link per line)',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 10),
+              _field(
+                downloadLinks,
+                'Extra download links (one link per line)',
+                maxLines: 3,
+              ),
+            ],
             const SizedBox(height: 16),
             Row(
               children: [
@@ -2281,11 +2353,101 @@ class _EditorCard extends StatelessWidget {
   }
 }
 
-class _LibraryPanel extends StatelessWidget {
+class _GenreMultiPicker extends StatelessWidget {
+  const _GenreMultiPicker({
+    required this.selectedGenres,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<String> selectedGenres;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('genre_sections')
+          .orderBy('order')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final genres =
+            snapshot.data?.docs
+                .map((doc) => (doc.data()['title'] ?? doc.id).toString())
+                .where((title) => title.trim().isNotEmpty)
+                .toList() ??
+            const <String>[];
+        final choices = genres.isEmpty
+            ? const ['Latest Movies', 'Latest Series', 'Action', 'Drama']
+            : genres;
+        final available = choices
+            .where((genre) => !selectedGenres.contains(genre))
+            .toList();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: null,
+              items: available
+                  .map(
+                    (genre) =>
+                        DropdownMenuItem(value: genre, child: Text(genre)),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) onAdd(value);
+              },
+              decoration: const InputDecoration(
+                labelText: 'Add genre',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (selectedGenres.isEmpty)
+              const Text(
+                'No genre selected.',
+                style: TextStyle(color: Color(0xFFAAB4C8)),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: selectedGenres
+                    .map(
+                      (genre) => InputChip(
+                        label: Text(genre),
+                        onDeleted: () => onRemove(genre),
+                      ),
+                    )
+                    .toList(),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LibraryPanel extends StatefulWidget {
   const _LibraryPanel({required this.firebaseReady, required this.onEdit});
 
   final bool firebaseReady;
   final ValueChanged<QueryDocumentSnapshot<Map<String, dynamic>>> onEdit;
+
+  @override
+  State<_LibraryPanel> createState() => _LibraryPanelState();
+}
+
+class _LibraryPanelState extends State<_LibraryPanel> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2300,7 +2462,27 @@ class _LibraryPanel extends StatelessWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 14),
-          if (!firebaseReady)
+          TextField(
+            controller: _search,
+            onChanged: (value) => setState(() => _query = value.trim()),
+            decoration: InputDecoration(
+              labelText: 'Search title, genre, quality',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _search.clear();
+                        setState(() => _query = '');
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (!widget.firebaseReady)
             const Text(
               'Connect Firebase to see documents here.',
               style: TextStyle(color: Color(0xFFAAB4C8)),
@@ -2310,10 +2492,12 @@ class _LibraryPanel extends StatelessWidget {
               stream: FirebaseFirestore.instance
                   .collection('media')
                   .orderBy('createdAt', descending: true)
-                  .limit(25)
+                  .limit(200)
                   .snapshots(),
               builder: (context, snapshot) {
-                final docs = snapshot.data?.docs ?? [];
+                final docs = (snapshot.data?.docs ?? [])
+                    .where(_matches)
+                    .toList();
                 if (docs.isEmpty) {
                   return const Text(
                     'No media documents yet.',
@@ -2336,7 +2520,7 @@ class _LibraryPanel extends StatelessWidget {
                           IconButton(
                             tooltip: 'Edit',
                             icon: const Icon(Icons.edit_rounded),
-                            onPressed: () => onEdit(doc),
+                            onPressed: () => widget.onEdit(doc),
                           ),
                           IconButton(
                             tooltip: 'Delete',
@@ -2353,6 +2537,19 @@ class _LibraryPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  bool _matches(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    if (_query.isEmpty) return true;
+    final data = doc.data();
+    final query = _query.toLowerCase();
+    final genres = data['genres'] is List
+        ? (data['genres'] as List).join(', ')
+        : (data['genre'] ?? '').toString();
+    return (data['title'] ?? '').toString().toLowerCase().contains(query) ||
+        (data['type'] ?? '').toString().toLowerCase().contains(query) ||
+        (data['quality'] ?? '').toString().toLowerCase().contains(query) ||
+        genres.toLowerCase().contains(query);
   }
 }
 

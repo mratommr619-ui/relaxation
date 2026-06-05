@@ -11,11 +11,13 @@ import 'telethon_resolver.dart';
 class AndroidTelegramAuthState {
   const AndroidTelegramAuthState({
     required this.authorized,
+    this.accountId = '',
     this.displayName = '',
     this.phone = '',
   });
 
   final bool authorized;
+  final String accountId;
   final String displayName;
   final String phone;
 }
@@ -38,6 +40,7 @@ class AndroidTelethonService {
     if (authorized) await _saveSession(data);
     return AndroidTelegramAuthState(
       authorized: authorized,
+      accountId: (data['id'] ?? '').toString(),
       displayName: _displayName(data),
       phone: (data['phone'] ?? '').toString(),
     );

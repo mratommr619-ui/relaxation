@@ -109,6 +109,7 @@ class MediaContent {
     required this.title,
     required this.type,
     required this.genre,
+    required this.genres,
     required this.quality,
     required this.description,
     required this.posterUrl,
@@ -129,6 +130,7 @@ class MediaContent {
   final String title;
   final MediaType type;
   final String genre;
+  final List<String> genres;
   final String quality;
   final String description;
   final String posterUrl;
@@ -151,11 +153,13 @@ class MediaContent {
 
   factory MediaContent.fromMap(String id, Map<String, dynamic> data) {
     final typeValue = (data['type'] ?? 'movie').toString().toLowerCase();
+    final genres = _genresFromData(data['genres'], data['genre']);
     return MediaContent(
       id: id,
       title: (data['title'] ?? 'Untitled').toString(),
       type: typeValue == 'series' ? MediaType.series : MediaType.movie,
-      genre: (data['genre'] ?? 'General').toString(),
+      genre: genres.isEmpty ? 'General' : genres.first,
+      genres: genres,
       quality: (data['quality'] ?? 'HD').toString(),
       description: (data['description'] ?? '').toString(),
       posterUrl: (data['posterUrl'] ?? '').toString(),
@@ -182,6 +186,7 @@ class MediaContent {
       'title': title,
       'type': type == MediaType.series ? 'series' : 'movie',
       'genre': genre,
+      'genres': genres,
       'quality': quality,
       'description': description,
       'posterUrl': posterUrl,
@@ -201,6 +206,27 @@ class MediaContent {
 
   IconData get icon =>
       type == MediaType.series ? Icons.live_tv_rounded : Icons.local_movies;
+
+  String get genreLabel => genres.isEmpty ? genre : genres.join(', ');
+}
+
+List<String> _genresFromData(dynamic value, dynamic legacyGenre) {
+  final genres = <String>[];
+  if (value is List) {
+    for (final entry in value) {
+      final genre = entry.toString().trim();
+      if (genre.isNotEmpty && !genres.contains(genre)) genres.add(genre);
+    }
+  }
+  final fallback = (legacyGenre ?? '').toString().trim();
+  if (genres.isEmpty && fallback.isNotEmpty) {
+    for (final part in fallback.split(',')) {
+      final genre = part.trim();
+      if (genre.isNotEmpty && !genres.contains(genre)) genres.add(genre);
+    }
+  }
+  if (genres.isEmpty) genres.add('General');
+  return genres;
 }
 
 List<MediaEpisode> _episodesFromData(dynamic value) {

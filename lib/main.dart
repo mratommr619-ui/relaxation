@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -20,6 +21,7 @@ import 'services/telethon_resolver.dart';
 import 'services/telegram_auth_service.dart';
 
 final appNavigatorKey = GlobalKey<NavigatorState>();
+final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,25 +36,42 @@ class RelaxationApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: appNavigatorKey,
-      title: 'Relaxation',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050812),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF33F0B0),
-          brightness: Brightness.dark,
-          primary: const Color(0xFF33F0B0),
-          secondary: const Color(0xFFFFC857),
-          surface: const Color(0xFF101827),
-        ),
-      ),
-      home: firebaseReady
-          ? const AuthGate()
-          : RelaxationHome(firebaseReady: firebaseReady),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          navigatorKey: appNavigatorKey,
+          title: 'Relaxation',
+          debugShowCheckedModeBanner: false,
+          themeMode: mode,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: const Color(0xFFF5F7FB),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF008C68),
+              brightness: Brightness.light,
+              primary: const Color(0xFF008C68),
+              secondary: const Color(0xFF9A6500),
+            ),
+          ),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF050812),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF33F0B0),
+              brightness: Brightness.dark,
+              primary: const Color(0xFF33F0B0),
+              secondary: const Color(0xFFFFC857),
+              surface: const Color(0xFF101827),
+            ),
+          ),
+          home: firebaseReady
+              ? const AuthGate()
+              : RelaxationHome(firebaseReady: firebaseReady),
+        );
+      },
     );
   }
 }
@@ -202,6 +221,12 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     if (widget.access.auth.currentUser == null) {
       await widget.access.signInAnonymously();
     }
+    final telegram = await _telegramAuth.status();
+    await widget.access.registerTelegramAccount(
+      accountId: telegram.accountId,
+      phone: telegram.phone,
+      displayName: telegram.displayName,
+    );
     await widget.access.startTrialAfterTelegramLogin();
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -435,25 +460,29 @@ class _HomeCatalog extends StatefulWidget {
 
 class _HomeCatalogState extends State<_HomeCatalog> {
   final _pageController = PageController(viewportFraction: .88);
+  final _search = TextEditingController();
   int _heroIndex = 0;
+  String _query = '';
 
   @override
   void dispose() {
     _pageController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final newestMovies = widget.items
+    final visibleItems = _filterItems(widget.items);
+    final newestMovies = visibleItems
         .where((item) => item.type == MediaType.movie)
         .take(15)
         .toList();
-    final newestSeries = widget.items
+    final newestSeries = visibleItems
         .where((item) => item.type == MediaType.series)
         .take(15)
         .toList();
-    final genres = _groupByGenre(widget.items);
+    final genres = _groupByGenre(visibleItems);
 
     return CustomScrollView(
       slivers: [
@@ -472,9 +501,32 @@ class _HomeCatalogState extends State<_HomeCatalog> {
                   ),
                 ],
                 const SizedBox(height: 18),
+                TextField(
+                  controller: _search,
+                  onChanged: (value) => setState(() => _query = value.trim()),
+                  decoration: InputDecoration(
+                    hintText: 'Search movies and series',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _search.clear();
+                              setState(() => _query = '');
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    filled: true,
+                  ),
+                ),
+                const SizedBox(height: 18),
                 _FeaturedSlider(
                   controller: _pageController,
-                  items: widget.items.take(6).toList(),
+                  items: visibleItems.take(6).toList(),
                   currentIndex: _heroIndex,
                   accessState: widget.accessState,
                   accessService: widget.accessService,
@@ -493,6 +545,7 @@ class _HomeCatalogState extends State<_HomeCatalog> {
                     items: newestMovies,
                     allItems: widget.items
                         .where((item) => item.type == MediaType.movie)
+                        .where(_matchesQuery)
                         .toList(),
                     accessState: widget.accessState,
                     accessService: widget.accessService,
@@ -503,6 +556,7 @@ class _HomeCatalogState extends State<_HomeCatalog> {
                     items: newestSeries,
                     allItems: widget.items
                         .where((item) => item.type == MediaType.series)
+                        .where(_matchesQuery)
                         .toList(),
                     accessState: widget.accessState,
                     accessService: widget.accessService,
@@ -525,11 +579,28 @@ class _HomeCatalogState extends State<_HomeCatalog> {
     );
   }
 
+  List<MediaContent> _filterItems(List<MediaContent> items) {
+    if (_query.isEmpty) return items;
+    return items.where(_matchesQuery).toList();
+  }
+
+  bool _matchesQuery(MediaContent item) {
+    if (_query.isEmpty) return true;
+    final query = _query.toLowerCase();
+    return item.title.toLowerCase().contains(query) ||
+        item.description.toLowerCase().contains(query) ||
+        item.quality.toLowerCase().contains(query) ||
+        item.genreLabel.toLowerCase().contains(query);
+  }
+
   Map<String, List<MediaContent>> _groupByGenre(List<MediaContent> items) {
     final grouped = <String, List<MediaContent>>{};
     for (final item in items) {
-      final genre = item.genre.trim().isEmpty ? 'General' : item.genre.trim();
-      grouped.putIfAbsent(genre, () => []).add(item);
+      final itemGenres = item.genres.isEmpty ? [item.genre] : item.genres;
+      for (final rawGenre in itemGenres) {
+        final genre = rawGenre.trim().isEmpty ? 'General' : rawGenre.trim();
+        grouped.putIfAbsent(genre, () => []).add(item);
+      }
     }
     return Map.fromEntries(
       grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
@@ -872,6 +943,22 @@ class _TopChrome extends StatelessWidget {
                 : const Color(0xFFFFC857),
           ),
         ),
+        const SizedBox(width: 8),
+        ValueListenableBuilder<ThemeMode>(
+          valueListenable: appThemeMode,
+          builder: (context, mode, _) {
+            final dark = mode == ThemeMode.dark;
+            return IconButton.filledTonal(
+              tooltip: dark ? 'Light mode' : 'Dark mode',
+              onPressed: () {
+                appThemeMode.value = dark ? ThemeMode.light : ThemeMode.dark;
+              },
+              icon: Icon(
+                dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -1021,7 +1108,7 @@ class FeaturedCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${item.type.label} • ${item.genre} • ${item.quality}',
+                    '${item.type.label} • ${item.genreLabel} • ${item.quality}',
                     style: const TextStyle(
                       color: Color(0xFFE6ECF7),
                       fontWeight: FontWeight.w700,
@@ -1491,9 +1578,47 @@ class MediaDetailScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
+                  Positioned.fill(
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                      child: Transform.scale(
+                        scale: 1.12,
+                        child: PosterFrame(item: item, fit: BoxFit.cover),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: .08),
+                            Colors.black.withValues(alpha: .52),
+                            const Color(0xFF050812),
+                          ],
+                          stops: const [0, .48, 1],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ),
                   Hero(
                     tag: 'poster-${item.id}',
-                    child: PosterFrame(item: item),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: SizedBox(
+                          width: 190,
+                          height: 280,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: PosterFrame(item: item),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -1526,7 +1651,7 @@ class MediaDetailScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          '${item.type.label} • ${item.genre} • ${item.quality}',
+                          '${item.type.label} • ${item.genreLabel} • ${item.quality}',
                           style: const TextStyle(
                             color: Color(0xFFDFE7F3),
                             fontWeight: FontWeight.w700,
@@ -1752,38 +1877,46 @@ class EpisodeSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFF263247)),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: const Color(0x2233F0B0),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0x2233F0B0),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          episode.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      episode.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    tooltip: 'Watch',
-                    onPressed: watchLinks.isEmpty
-                        ? null
-                        : () => openProtectedServerLink(
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...List.generate(watchLinks.length, (linkIndex) {
+                        final link = watchLinks[linkIndex];
+                        return FilledButton.tonalIcon(
+                          onPressed: () => openProtectedServerLink(
                             context,
-                            watchLinks.first.url,
+                            link.url,
                             ServerAction.watch,
                             '${item.title} - ${episode.label}',
                             episode.telegramUrl,
@@ -1791,16 +1924,16 @@ class EpisodeSection extends StatelessWidget {
                             accessState,
                             accessService,
                           ),
-                    icon: const Icon(Icons.play_arrow_rounded),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    tooltip: 'Download',
-                    onPressed: downloadLinks.isEmpty
-                        ? null
-                        : () => openProtectedServerLink(
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: Text('Watch ${linkIndex + 1}'),
+                        );
+                      }),
+                      ...List.generate(downloadLinks.length, (linkIndex) {
+                        final link = downloadLinks[linkIndex];
+                        return FilledButton.tonalIcon(
+                          onPressed: () => openProtectedServerLink(
                             context,
-                            downloadLinks.first.url,
+                            link.url,
                             ServerAction.download,
                             '${item.title} - ${episode.label}',
                             episode.telegramUrl,
@@ -1808,7 +1941,11 @@ class EpisodeSection extends StatelessWidget {
                             accessState,
                             accessService,
                           ),
-                    icon: const Icon(Icons.download_rounded),
+                          icon: const Icon(Icons.download_rounded),
+                          label: Text('Download ${linkIndex + 1}'),
+                        );
+                      }),
+                    ],
                   ),
                 ],
               ),

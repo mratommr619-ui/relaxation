@@ -181,6 +181,83 @@ class AccessService {
     });
   }
 
+  Future<void> registerTelegramAccount({
+    required String accountId,
+    required String phone,
+    required String displayName,
+  }) async {
+    final user = auth.currentUser;
+    if (user == null) {
+      throw const AccessException('Please sign in first.');
+    }
+    final accountKey = accountId.trim().isNotEmpty
+        ? accountId.trim()
+        : phone.trim().replaceAll(RegExp(r'\D+'), '');
+    if (accountKey.isEmpty) return;
+    final deviceHash = await currentDeviceHash();
+    final now = Timestamp.now();
+    final accountRef = firestore
+        .collection('telegram_accounts')
+        .doc(accountKey);
+    final sessionRef = accountRef.collection('devices').doc(deviceHash);
+    final deviceRef = firestore.collection('access_devices').doc(deviceHash);
+
+    await firestore.runTransaction((transaction) async {
+      transaction.set(accountRef, {
+        'accountId': accountId,
+        'phone': phone,
+        'displayName': displayName,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      transaction.set(sessionRef, {
+        'deviceHash': deviceHash,
+        'uid': user.uid,
+        'phone': phone,
+        'displayName': displayName,
+        'lastSeenAt': now,
+        'createdAt': now,
+      }, SetOptions(merge: true));
+      transaction.set(deviceRef, {
+        'telegramAccountKey': accountKey,
+        'telegramPhone': phone,
+        'telegramDisplayName': displayName,
+        'disabled': false,
+        'lastSeenAt': now,
+      }, SetOptions(merge: true));
+    });
+    await _enforceTwoDeviceLimit(accountKey, deviceHash);
+  }
+
+  Future<void> _enforceTwoDeviceLimit(
+    String accountKey,
+    String currentDeviceHash,
+  ) async {
+    final sessions = await firestore
+        .collection('telegram_accounts')
+        .doc(accountKey)
+        .collection('devices')
+        .orderBy('lastSeenAt', descending: true)
+        .limit(10)
+        .get();
+    final docs = sessions.docs;
+    if (docs.length <= 2) return;
+    final batch = firestore.batch();
+    for (final doc in docs.skip(2)) {
+      if (doc.id == currentDeviceHash) continue;
+      batch.update(doc.reference, {'kickedAt': Timestamp.now()});
+      batch.set(
+        firestore.collection('access_devices').doc(doc.id),
+        {
+          'disabled': true,
+          'disabledReason': 'Telegram account reached the 2-device limit.',
+          'disabledAt': Timestamp.now(),
+        },
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+  }
+
   Future<AccessState> activateLicense(String rawKey) async {
     final user = auth.currentUser;
     if (user == null) {

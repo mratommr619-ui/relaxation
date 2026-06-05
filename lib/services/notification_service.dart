@@ -128,7 +128,7 @@ class NotificationService {
             _showLocal(
               title: 'New $typeLabel: ${item.title}',
               body: item.description.isEmpty
-                  ? '${item.genre} • ${item.quality}'
+                  ? '${item.genreLabel} • ${item.quality}'
                   : item.description,
               imageUrl: item.posterUrl,
               payload: {'type': 'media', 'mediaId': item.id},
