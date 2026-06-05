@@ -10,6 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'models/media_content.dart';
 import 'services/access_service.dart';
+import 'services/android_telethon_service.dart';
 import 'services/download_service.dart';
 import 'services/firebase_bootstrap.dart';
 import 'services/local_telethon_service.dart';
@@ -200,6 +201,9 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
   Future<void> _ensureFirebaseAccess() async {
     if (widget.access.auth.currentUser == null) {
       await widget.access.signInAnonymously();
+    }
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -2204,6 +2208,34 @@ Future<ResolvedTelegramMedia?> resolveTelegramOnDemand(
     ),
   );
   try {
+    if (AndroidTelethonService.instance.isSupported) {
+      try {
+        final resolved = await AndroidTelethonService.instance.resolve(
+          telegramUrl,
+        );
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+        return resolved;
+      } catch (error) {
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+        if (!context.mounted) return null;
+        final message = error.toString();
+        if (message.contains('login') || message.contains('Session')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please login with Telegram to continue.'),
+            ),
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TelegramSignInScreen(access: AccessService()),
+            ),
+          );
+          return null;
+        }
+        messenger.showSnackBar(SnackBar(content: Text(message)));
+        return null;
+      }
+    }
     final baseUrl = await effectiveTelethonBaseUrl(ingestBaseUrl);
     if (baseUrl.isEmpty) {
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();

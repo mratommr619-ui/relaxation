@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'android_telethon_service.dart';
 import 'local_telethon_service.dart';
 
 class TelegramAuthState {
@@ -26,7 +27,7 @@ class TelegramAuthService {
        _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance;
 
-  static const _sessionKey = 'telegramSessionString';
+  static const _sessionKey = AndroidTelethonService.sessionKey;
   static const _apiIdFallback = 36969505;
   static const _apiHashFallback = 'f129bfcfe08725b285d2a1938fc18380';
 
@@ -36,6 +37,14 @@ class TelegramAuthService {
 
   Future<TelegramAuthState> status() async {
     await _ensureFirebaseIdentity();
+    if (AndroidTelethonService.instance.isSupported) {
+      final state = await AndroidTelethonService.instance.status();
+      return TelegramAuthState(
+        authorized: state.authorized,
+        displayName: state.displayName,
+        phone: state.phone,
+      );
+    }
     final config = await _loadConfig();
     if (!config.hasApiCredentials) {
       return const TelegramAuthState(authorized: false);
@@ -61,6 +70,11 @@ class TelegramAuthService {
   }
 
   Future<void> sendCode(String phone) async {
+    if (AndroidTelethonService.instance.isSupported) {
+      await _ensureFirebaseIdentity();
+      await AndroidTelethonService.instance.sendCode(phone);
+      return;
+    }
     final baseUrl = await _startLoginHelper();
     await _dio.post<Map<String, dynamic>>(
       '$baseUrl/auth/send_code',
@@ -69,6 +83,10 @@ class TelegramAuthService {
   }
 
   Future<bool> signInWithCode(String phone, String code) async {
+    if (AndroidTelethonService.instance.isSupported) {
+      await _ensureFirebaseIdentity();
+      return AndroidTelethonService.instance.signInWithCode(phone, code);
+    }
     final baseUrl = await _startLoginHelper();
     final response = await _dio.post<Map<String, dynamic>>(
       '$baseUrl/auth/sign_in',
@@ -81,6 +99,11 @@ class TelegramAuthService {
   }
 
   Future<void> signInWithPassword(String password) async {
+    if (AndroidTelethonService.instance.isSupported) {
+      await _ensureFirebaseIdentity();
+      await AndroidTelethonService.instance.signInWithPassword(password);
+      return;
+    }
     final baseUrl = await _startLoginHelper();
     final response = await _dio.post<Map<String, dynamic>>(
       '$baseUrl/auth/password',

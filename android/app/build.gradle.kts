@@ -1,9 +1,17 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    id("com.chaquo.python")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val chaquopyBuildPython =
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        "C:/Users/Dell/AppData/Local/Programs/Python/Python311/python.exe"
+    } else {
+        "python3.11"
+    }
 
 android {
     namespace = "com.mratom.relaxation"
@@ -25,10 +33,25 @@ android {
         applicationId = "com.mratom.relaxation"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
+    }
+
+    chaquopy {
+        defaultConfig {
+            version = "3.11"
+            buildPython(chaquopyBuildPython)
+            pip {
+                install("../python_packages/pyaes-1.6.1.tar.gz")
+                install("rsa==4.9.1")
+                install("telethon==1.42.0")
+            }
+        }
     }
 
     buildTypes {
