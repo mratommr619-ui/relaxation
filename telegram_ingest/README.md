@@ -92,3 +92,30 @@ curl -X POST http://127.0.0.1:8088/import `
 The service also accepts `https://t.me/s/...`, private `https://t.me/c/...`
 links when the session account has access, `telegram.me/...`, and raw
 `ChannelName/12345` values.
+
+## Production Scale: Cache to Firebase Storage
+
+For large public traffic, do not stream Telegram through Telethon for every
+viewer. Cache each Telegram file once, then serve Android/Web users from
+Firebase Storage or a CDN-backed storage bucket.
+
+```powershell
+$env:TELEGRAM_API_ID="YOUR_API_ID"
+$env:TELEGRAM_API_HASH="YOUR_API_HASH"
+$env:TELEGRAM_SESSION_STRING="YOUR_SESSION_STRING"
+$env:FIREBASE_STORAGE_BUCKET="our-relaxation.firebasestorage.app"
+
+python telegram_ingest/cache_to_storage.py `
+  --service-account .\firebase-service-account.json `
+  --telegram-url "https://t.me/Head_Over_Heels_mmsub/97" `
+  --doc-id "FIRESTORE_MEDIA_DOC_ID"
+```
+
+The script uploads the video to Storage, creates a long-lived Firebase download
+URL, and updates:
+
+- `streamUrl`
+- `downloadUrl`
+- `watchLinks`
+- `downloadLinks`
+- `cachedStoragePath`

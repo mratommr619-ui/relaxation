@@ -1,0 +1,54 @@
+name: Cache Telegram Media
+
+on:
+  workflow_dispatch:
+    inputs:
+      telegram_url:
+        description: "Telegram post URL"
+        required: true
+        type: string
+      doc_id:
+        description: "Firestore media document ID; leave blank to create a new document"
+        required: false
+        type: string
+      title:
+        description: "Title to use when creating a new document"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+      TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      FIREBASE_STORAGE_BUCKET: our-relaxation.firebasestorage.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r telegram_ingest/requirements.txt
+
+      - name: Cache media and update Firestore
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVICE_ACCOUNT_PATH="${RUNNER_TEMP}/firebase-service-account.json"
+          printf '%s' "${FIREBASE_SERVICE_ACCOUNT_JSON}" > "${SERVICE_ACCOUNT_PATH}"
+          python telegram_ingest/cache_to_storage.py \
+            --service-account "${SERVICE_ACCOUNT_PATH}" \
+            --telegram-url "${{ inputs.telegram_url }}" \
+            --doc-id "${{ inputs.doc_id }}" \
+            --title "${{ inputs.title }}"

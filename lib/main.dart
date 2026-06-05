@@ -1855,6 +1855,36 @@ class _VideoWatchScreenState extends State<VideoWatchScreen> {
         child: FutureBuilder<void>(
           future: _initialize,
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFFFC857),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Video could not be loaded.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => openExternal(widget.url),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Open source'),
+                    ),
+                  ],
+                ),
+              );
+            }
             if (snapshot.connectionState != ConnectionState.done) {
               return const CircularProgressIndicator();
             }
@@ -2281,7 +2311,7 @@ Future<void> downloadProtectedFile(
   String url,
   String title,
 ) async {
-  if (_isTelegramWebUrl(url)) {
+  if (kIsWeb || _isTelegramWebUrl(url)) {
     openExternal(url);
     return;
   }
