@@ -32,22 +32,25 @@ jobs:
         run: |
           mkdir -p build/app/outputs/relaxation-release
           RELAXATION_ABIS=arm64-v8a flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/app/outputs/symbols
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/relaxation-release/relaxation-phone-tablet-tv-arm64-v8a-release.apk
-          RELAXATION_ABIS=armeabi-v7a flutter build apk --release --target-platform android-arm --obfuscate --split-debug-info=build/app/outputs/symbols
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/relaxation-release/relaxation-phone-tablet-armeabi-v7a-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/relaxation-release/relaxation-phone-arm64-v8a-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/relaxation-release/relaxation-tablet-arm64-v8a-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/relaxation-release/relaxation-tv-arm64-v8a-release.apk
       - name: Build Web
         run: flutter build web
       - name: Build Linux
         run: flutter build linux
       - uses: actions/upload-artifact@v4
         with:
-          name: relaxation-android-web-linux
-          path: |
-            build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/relaxation-release/*.apk
-            build/app/outputs/symbols/**
-            build/web/**
-            build/linux/**
+          name: relaxation-android-apks
+          path: build/app/outputs/relaxation-release/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-web
+          path: build/web/**
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-linux
+          path: build/linux/x64/release/bundle/**
 
   admin-web:
     runs-on: ubuntu-latest
@@ -68,6 +71,25 @@ jobs:
           name: relaxation-admin-web
           path: admin_panel/build/web/**
 
+  admin-android:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Admin pub get
+        working-directory: admin_panel
+        run: flutter pub get
+      - name: Admin Android release
+        working-directory: admin_panel
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-admin-android
+          path: admin_panel/build/app/outputs/flutter-apk/app-release.apk
+
   windows:
     runs-on: windows-latest
     steps:
@@ -81,7 +103,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: relaxation-windows
-          path: build/windows/**
+          path: build/windows/x64/runner/Release/**
 
   macos:
     runs-on: macos-latest
@@ -96,4 +118,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: relaxation-macos
-          path: build/macos/**
+          path: build/macos/Build/Products/Release/*.app/**
