@@ -12,6 +12,13 @@ val chaquopyBuildPython =
     } else {
         "python3.11"
     }
+val relaxationAbis =
+    (providers.environmentVariable("RELAXATION_ABIS").orNull
+        ?: providers.gradleProperty("relaxationAbis").orNull
+        ?: "armeabi-v7a,arm64-v8a,x86_64")
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
 
 android {
     namespace = "com.mratom.relaxation"
@@ -38,7 +45,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            abiFilters += relaxationAbis
         }
     }
 

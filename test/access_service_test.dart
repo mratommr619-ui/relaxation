@@ -10,4 +10,13 @@ void main() {
       DateTime(2026, 7, 5, 10, 30),
     );
   });
+
+  test('trial expiry starts from Telegram login time', () {
+    final loggedInAt = DateTime(2026, 6, 5, 20, 15);
+
+    expect(
+      trialExpiryFromTelegramLogin(loggedInAt),
+      DateTime(2026, 6, 8, 20, 15),
+    );
+  });
 }

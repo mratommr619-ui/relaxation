@@ -202,6 +202,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     if (widget.access.auth.currentUser == null) {
       await widget.access.signInAnonymously();
     }
+    await widget.access.startTrialAfterTelegramLogin();
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
@@ -570,6 +571,8 @@ class AccessStatusBar extends StatelessWidget {
         ? state!.isPremium
               ? 'Premium active • ${state!.daysLeft} days left'
               : 'Free trial • ${state!.daysLeft} days left'
+        : state!.trialExpiresAt == null
+        ? 'Login with Telegram to start 3-day trial'
         : 'Trial expired • Activate license';
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -619,7 +622,9 @@ class RelaxationDrawer extends StatelessWidget {
     final expireDate = accessState == null
         ? 'Checking...'
         : accessState!.expiryDate == null
-        ? 'Expired'
+        ? accessState!.trialExpiresAt == null
+              ? 'Not started'
+              : 'Expired'
         : formatDate(accessState!.expiryDate!);
     return Drawer(
       backgroundColor: const Color(0xFF080D18),
@@ -2036,10 +2041,10 @@ class _TelegramWebWatchScreenState extends State<TelegramWebWatchScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF050812),
       appBar: AppBar(
-        title: const Text('Telegram Stream'),
+        title: const Text('Video'),
         actions: [
           IconButton(
-            tooltip: 'Open Telegram',
+            tooltip: 'Open source',
             onPressed: () => openExternal(_telegramAppUrl(widget.url)),
             icon: const Icon(Icons.open_in_new_rounded),
           ),
@@ -2193,7 +2198,7 @@ Future<ResolvedTelegramMedia?> resolveTelegramOnDemand(
     context: context,
     barrierDismissible: false,
     builder: (_) => const AlertDialog(
-      title: Text('Preparing link'),
+      title: Text('Preparing video'),
       content: Row(
         children: [
           SizedBox(
@@ -2202,7 +2207,7 @@ Future<ResolvedTelegramMedia?> resolveTelegramOnDemand(
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           SizedBox(width: 14),
-          Expanded(child: Text('Telethon stream link ပြောင်းနေပါတယ်...')),
+          Expanded(child: Text('Preparing playback...')),
         ],
       ),
     ),

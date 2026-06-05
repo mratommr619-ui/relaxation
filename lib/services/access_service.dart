@@ -131,10 +131,9 @@ class AccessService {
           'deviceHash': deviceHash,
           'createdAt': now,
           'lastSeenAt': now,
-          'trialStartedAt': now,
-          'trialExpiresAt': Timestamp.fromDate(
-            DateTime.now().add(const Duration(days: 3)),
-          ),
+          'trialStartedAt': null,
+          'trialExpiresAt': null,
+          'trialStartedByTelegram': false,
           'linkedUids': [user.uid],
           'lastUid': user.uid,
           'lastEmail': user.email ?? '',
@@ -153,6 +152,32 @@ class AccessService {
           'lastEmail': user.email ?? '',
         });
       }
+    });
+  }
+
+  Future<void> startTrialAfterTelegramLogin() async {
+    final user = auth.currentUser;
+    if (user == null) {
+      throw const AccessException('Please sign in first.');
+    }
+    final deviceHash = await currentDeviceHash();
+    await ensureDeviceAccess(user, deviceHash);
+    final ref = firestore.collection('access_devices').doc(deviceHash);
+    await firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(ref);
+      final data = snap.data() ?? {};
+      if (_timestampToDate(data['licenseExpiresAt']) != null ||
+          data['trialStartedByTelegram'] == true) {
+        transaction.update(ref, {'lastSeenAt': Timestamp.now()});
+        return;
+      }
+      final now = DateTime.now();
+      transaction.update(ref, {
+        'trialStartedAt': Timestamp.fromDate(now),
+        'trialExpiresAt': Timestamp.fromDate(trialExpiryFromTelegramLogin(now)),
+        'trialStartedByTelegram': true,
+        'lastSeenAt': Timestamp.fromDate(now),
+      });
     });
   }
 
@@ -270,4 +295,8 @@ DateTime? _timestampToDate(dynamic value) {
 
 DateTime licenseExpiryFromActivation(DateTime activatedAt, int days) {
   return activatedAt.add(Duration(days: days));
+}
+
+DateTime trialExpiryFromTelegramLogin(DateTime loggedInAt) {
+  return loggedInAt.add(const Duration(days: 3));
 }
