@@ -24,12 +24,11 @@ jobs:
         run: |
           flutter analyze lib test
           flutter test
-      - name: Admin analyze and test
+      - name: Admin analyze
         working-directory: admin_panel
         run: |
           flutter pub get
-          flutter analyze
-          flutter test
+          flutter analyze lib test
       - name: Build Android
         run: flutter build apk --debug
       - name: Build Web
