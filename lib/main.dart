@@ -180,9 +180,13 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     }
     await _runBusy(() async {
       await _telegramAuth.sendCode(_phone.text);
+      _code.clear();
       setState(() => _step = _TelegramLoginStep.code);
+      _showMessage('Telegram code sent. Use the newest code.');
     });
   }
+
+  Future<void> _resendCode() => _sendCode();
 
   Future<void> _verifyCode() async {
     if (_code.text.trim().isEmpty) {
@@ -194,14 +198,14 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     await _runBusy(() async {
       final complete = await _telegramAuth.signInWithCode(
         _phone.text,
-        _code.text,
+        _code.text.trim(),
       );
       if (complete) {
         await _ensureFirebaseAccess();
       } else {
         setState(() => _step = _TelegramLoginStep.password);
       }
-    });
+    }, onError: _handleCodeError);
   }
 
   Future<void> _verifyPassword() async {
@@ -233,16 +237,60 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     }
   }
 
-  Future<void> _runBusy(Future<void> Function() action) async {
+  Future<void> _runBusy(
+    Future<void> Function() action, {
+    bool Function(Object error)? onError,
+  }) async {
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await action();
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      final handled = onError?.call(error) ?? false;
+      if (!handled) _showMessage(_friendlyTelegramError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  bool _handleCodeError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('phonecodeexpirederror') ||
+        message.contains('confirmation code has expired') ||
+        message.contains('code has expired')) {
+      _code.clear();
+      if (mounted) setState(() => _step = _TelegramLoginStep.code);
+      _showMessage(
+        'Telegram code expired. Tap Resend code and use the newest code.',
+      );
+      return true;
+    }
+    if (message.contains('phonecodeinvaliderror') ||
+        message.contains('invalid code')) {
+      _code.clear();
+      _showMessage(
+        'Invalid Telegram code. Check the newest code and try again.',
+      );
+      return true;
+    }
+    return false;
+  }
+
+  String _friendlyTelegramError(Object error) {
+    final message = error.toString();
+    if (message.contains('ANDROID_TELETHON')) {
+      return message
+          .replaceAll(RegExp(r'PlatformException\([^,]+,\s*'), '')
+          .split(', null')
+          .first;
+    }
+    return message;
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -300,14 +348,25 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                       onSubmitted: (_) => _verifyCode(),
                     ),
                     const SizedBox(height: 10),
-                    TextButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () => setState(
-                              () => _step = _TelegramLoginStep.phone,
-                            ),
-                      icon: const Icon(Icons.edit_rounded),
-                      label: const Text('Change phone number'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _busy ? null : _resendCode,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Resend code'),
+                        ),
+                        TextButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => setState(
+                                  () => _step = _TelegramLoginStep.phone,
+                                ),
+                          icon: const Icon(Icons.edit_rounded),
+                          label: const Text('Change phone number'),
+                        ),
+                      ],
                     ),
                   ] else ...[
                     TextField(
