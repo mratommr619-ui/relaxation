@@ -299,130 +299,255 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(22),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 440),
-              padding: const EdgeInsets.all(22),
+      backgroundColor: const Color(0xFF050812),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0xFF101827),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: const Color(0xFF263247)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Relaxation',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Use your Telegram account to stream public channel videos. No Gmail login required.',
-                    style: TextStyle(color: Color(0xFFB8C4D8)),
-                  ),
-                  const SizedBox(height: 22),
-                  if (_step == _TelegramLoginStep.phone) ...[
-                    TextField(
-                      controller: _phone,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Telegram phone number',
-                        hintText: '+959...',
-                        prefixIcon: Icon(Icons.phone_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _sendCode(),
-                    ),
-                  ] else if (_step == _TelegramLoginStep.code) ...[
-                    TextField(
-                      controller: _code,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Telegram code',
-                        prefixIcon: Icon(Icons.sms_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _verifyCode(),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _busy ? null : _resendCode,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Resend code'),
-                        ),
-                        TextButton.icon(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(
-                                  () => _step = _TelegramLoginStep.phone,
-                                ),
-                          icon: const Icon(Icons.edit_rounded),
-                          label: const Text('Change phone number'),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    TextField(
-                      controller: _password,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Telegram 2FA password',
-                        prefixIcon: Icon(Icons.lock_rounded),
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _verifyPassword(),
-                    ),
+                gradient: RadialGradient(
+                  center: const Alignment(-.9, -1),
+                  radius: 1.2,
+                  colors: [
+                    const Color(0xFF1C4D49).withValues(alpha: .42),
+                    const Color(0xFF050812),
                   ],
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : _step == _TelegramLoginStep.phone
-                          ? _sendCode
-                          : _step == _TelegramLoginStep.code
-                          ? _verifyCode
-                          : _verifyPassword,
-                      icon: Icon(
-                        _step == _TelegramLoginStep.phone
-                            ? Icons.send_rounded
-                            : Icons.login_rounded,
-                      ),
-                      label: Text(
-                        _busy
-                            ? 'Please wait...'
-                            : _step == _TelegramLoginStep.phone
-                            ? 'Send Telegram Code'
-                            : _step == _TelegramLoginStep.code
-                            ? 'Verify Code'
-                            : 'Verify Password',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Telegram does not provide one-click MTProto login. A phone code is required so the app can stream video links directly.',
-                    style: TextStyle(color: Color(0xFF91A1BC), fontSize: 12),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(22),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101827).withValues(alpha: .94),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: const Color(0xFF2D3A52)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .45),
+                        blurRadius: 28,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF33F0B0), Color(0xFF5B8DEF)],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              color: Color(0xFF04110C),
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Telegram Login',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    height: 1,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                SizedBox(height: 5),
+                                Text(
+                                  'Start your trial and unlock playback',
+                                  style: TextStyle(color: Color(0xFFB8C4D8)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'No Gmail login required. We use your Telegram session only to open public channel videos inside the app.',
+                        style: TextStyle(
+                          color: Color(0xFFB8C4D8),
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _TelegramStepPill(step: _step),
+                      const SizedBox(height: 18),
+                      if (_step == _TelegramLoginStep.phone) ...[
+                        TextField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Telegram phone number',
+                            hintText: '+959...',
+                            prefixIcon: Icon(Icons.phone_rounded),
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _sendCode(),
+                        ),
+                      ] else if (_step == _TelegramLoginStep.code) ...[
+                        TextField(
+                          controller: _code,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Telegram code',
+                            prefixIcon: Icon(Icons.sms_rounded),
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _verifyCode(),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            TextButton.icon(
+                              onPressed: _busy ? null : _resendCode,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Resend code'),
+                            ),
+                            TextButton.icon(
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(
+                                      () => _step = _TelegramLoginStep.phone,
+                                    ),
+                              icon: const Icon(Icons.edit_rounded),
+                              label: const Text('Change phone number'),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        const Text(
+                          'Two-step verification is enabled. Enter your Telegram cloud password to finish login.',
+                          style: TextStyle(
+                            color: Color(0xFFB8C4D8),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _password,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Telegram 2FA password',
+                            prefixIcon: Icon(Icons.lock_rounded),
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _verifyPassword(),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : _step == _TelegramLoginStep.phone
+                              ? _sendCode
+                              : _step == _TelegramLoginStep.code
+                              ? _verifyCode
+                              : _verifyPassword,
+                          icon: Icon(
+                            _step == _TelegramLoginStep.phone
+                                ? Icons.send_rounded
+                                : Icons.login_rounded,
+                          ),
+                          label: Text(
+                            _busy
+                                ? 'Please wait...'
+                                : _step == _TelegramLoginStep.phone
+                                ? 'Send Telegram Code'
+                                : _step == _TelegramLoginStep.code
+                                ? 'Verify Code'
+                                : 'Verify Password',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'If a code expires, tap Resend code and enter the newest Telegram message code.',
+                        style: TextStyle(
+                          color: Color(0xFF91A1BC),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 enum _TelegramLoginStep { phone, code, password }
+
+class _TelegramStepPill extends StatelessWidget {
+  const _TelegramStepPill({required this.step});
+
+  final _TelegramLoginStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = [
+      (_TelegramLoginStep.phone, 'Phone'),
+      (_TelegramLoginStep.code, 'Code'),
+      (_TelegramLoginStep.password, '2FA'),
+    ];
+    return Row(
+      children: labels.map((entry) {
+        final active = entry.$1 == step;
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              color: active ? const Color(0xFF33F0B0) : const Color(0xFF182236),
+              border: Border.all(
+                color: active
+                    ? const Color(0xFF33F0B0)
+                    : const Color(0xFF2D3A52),
+              ),
+            ),
+            child: Text(
+              entry.$2,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: active
+                    ? const Color(0xFF04110C)
+                    : const Color(0xFFB8C4D8),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
 
 class RelaxationHome extends StatelessWidget {
   RelaxationHome({
@@ -1937,27 +2062,45 @@ class EpisodeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF101827),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF263247)),
+        color: dark ? const Color(0xFF101827) : colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? .26 : .08),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.playlist_play_rounded, color: Color(0xFF33F0B0)),
-              SizedBox(width: 10),
+              Icon(Icons.playlist_play_rounded, color: colors.primary),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Episodes',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+              ),
               Text(
-                'Episodes',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                '${item.episodes.length}',
+                style: TextStyle(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ...List.generate(item.episodes.length, (index) {
             final episode = item.episodes[index];
             final watchLinks = _linksWithTelegramFallback(
@@ -1970,22 +2113,30 @@ class EpisodeSection extends StatelessWidget {
             );
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1220),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF263247)),
+                color: dark ? const Color(0xFF0B1220) : const Color(0xFFF8FAFD),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: colors.outlineVariant),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Container(
-                        width: 42,
-                        height: 42,
+                        width: 46,
+                        height: 46,
                         decoration: BoxDecoration(
-                          color: const Color(0x2233F0B0),
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: LinearGradient(
+                            colors: [
+                              colors.primary.withValues(alpha: .28),
+                              colors.primary.withValues(alpha: .10),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: Center(
                           child: Text(
@@ -2000,48 +2151,60 @@ class EpisodeSection extends StatelessWidget {
                           episode.label,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  const SizedBox(height: 12),
+                  Column(
                     children: [
                       ...List.generate(watchLinks.length, (linkIndex) {
                         final link = watchLinks[linkIndex];
-                        return FilledButton.tonalIcon(
-                          onPressed: () => openProtectedServerLink(
-                            context,
-                            link.url,
-                            ServerAction.watch,
-                            '${item.title} - ${episode.label}',
-                            episode.telegramUrl,
-                            item.ingestBaseUrl,
-                            accessState,
-                            accessService,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _EpisodeActionButton(
+                            label: 'Watch ${linkIndex + 1}',
+                            icon: Icons.play_arrow_rounded,
+                            filled: true,
+                            onPressed: () => openProtectedServerLink(
+                              context,
+                              link.url,
+                              ServerAction.watch,
+                              '${item.title} - ${episode.label}',
+                              episode.telegramUrl,
+                              item.ingestBaseUrl,
+                              accessState,
+                              accessService,
+                            ),
                           ),
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: Text('Watch ${linkIndex + 1}'),
                         );
                       }),
                       ...List.generate(downloadLinks.length, (linkIndex) {
                         final link = downloadLinks[linkIndex];
-                        return FilledButton.tonalIcon(
-                          onPressed: () => openProtectedServerLink(
-                            context,
-                            link.url,
-                            ServerAction.download,
-                            '${item.title} - ${episode.label}',
-                            episode.telegramUrl,
-                            item.ingestBaseUrl,
-                            accessState,
-                            accessService,
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: linkIndex == downloadLinks.length - 1
+                                ? 0
+                                : 8,
                           ),
-                          icon: const Icon(Icons.download_rounded),
-                          label: Text('Download ${linkIndex + 1}'),
+                          child: _EpisodeActionButton(
+                            label: 'Download ${linkIndex + 1}',
+                            icon: Icons.download_rounded,
+                            onPressed: () => openProtectedServerLink(
+                              context,
+                              link.url,
+                              ServerAction.download,
+                              '${item.title} - ${episode.label}',
+                              episode.telegramUrl,
+                              item.ingestBaseUrl,
+                              accessState,
+                              accessService,
+                            ),
+                          ),
                         );
                       }),
                     ],
@@ -2051,6 +2214,49 @@ class EpisodeSection extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+class _EpisodeActionButton extends StatelessWidget {
+  const _EpisodeActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final style = filled
+        ? FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          )
+        : FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            backgroundColor: colors.secondaryContainer,
+            foregroundColor: colors.onSecondaryContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          );
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        style: style,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
       ),
     );
   }

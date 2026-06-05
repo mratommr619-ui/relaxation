@@ -72,7 +72,7 @@ async def _send_code(args):
     try:
         sent = await client.send_code_request(phone)
         _phone_hashes[phone] = sent.phone_code_hash
-        return {"ok": True}
+        return {"ok": True, "sessionString": client.session.save()}
     finally:
         await client.disconnect()
 

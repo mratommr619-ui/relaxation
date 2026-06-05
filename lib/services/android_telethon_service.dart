@@ -47,7 +47,8 @@ class AndroidTelethonService {
   }
 
   Future<void> sendCode(String phone) async {
-    await _invoke('sendCode', extra: {'phone': phone.trim()});
+    final data = await _invoke('sendCode', extra: {'phone': phone.trim()});
+    await _saveSession(data);
   }
 
   Future<bool> signInWithCode(String phone, String code) async {
