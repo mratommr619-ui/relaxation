@@ -12,6 +12,9 @@ jobs:
   tunnel:
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    concurrency:
+      group: telethon-ingest
+      cancel-in-progress: true
     env:
       TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
       TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -49,7 +52,11 @@ jobs:
           SERVICE_ACCOUNT_PATH="${RUNNER_TEMP}/firebase-service-account.json"
           printf '%s' "${FIREBASE_SERVICE_ACCOUNT_JSON}" > "${SERVICE_ACCOUNT_PATH}"
 
-          ./cloudflared tunnel --url "http://127.0.0.1:${PORT}" --no-autoupdate > "${RUNNER_TEMP}/cloudflared.log" 2>&1 &
+          ./cloudflared tunnel \
+            --url "http://127.0.0.1:${PORT}" \
+            --protocol http2 \
+            --edge-ip-version 4 \
+            --no-autoupdate > "${RUNNER_TEMP}/cloudflared.log" 2>&1 &
           CLOUDFLARED_PID=$!
 
           cleanup() {
@@ -89,6 +96,14 @@ jobs:
             sleep 1
           done
           curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null
+
+          for _ in {1..90}; do
+            if curl -4 -fsS "${PUBLIC_BASE_URL}/health" >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -4 -fsS "${PUBLIC_BASE_URL}/health" >/dev/null
 
           python scripts/set_telethon_setting.py \
             --service-account "${SERVICE_ACCOUNT_PATH}" \
