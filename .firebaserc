@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "our-relaxation"
+  },
+  "targets": {
+    "our-relaxation": {
+      "hosting": {
+        "app": [
+          "our-relaxation"
+        ],
+        "admin": [
+          "our-relaxation-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

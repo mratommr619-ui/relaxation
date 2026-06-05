@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "your-firebase-project-id"
+  },
+  "targets": {
+    "your-firebase-project-id": {
+      "hosting": {
+        "app": ["your-relaxation-app-site"],
+        "admin": ["your-relaxation-admin-site"]
+      }
+    }
+  }
+}

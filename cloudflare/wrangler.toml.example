@@ -1,0 +1,7 @@
+name = "relaxation-media-cache"
+main = "worker.js"
+compatibility_date = "2026-06-04"
+
+routes = [
+  { pattern = "media-cache.example.com/*", custom_domain = true }
+]

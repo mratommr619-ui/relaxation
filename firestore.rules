@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /media/{mediaId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /ads/{adId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /genre_sections/{genreId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /app_settings/{settingId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /access_devices/{deviceHash} {
+      allow get: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.deviceHash == deviceHash;
+      allow update: if signedIn() &&
+        resource.data.deviceHash == deviceHash &&
+        (
+          isAdmin() ||
+          request.auth.uid in resource.data.linkedUids ||
+          request.auth.uid in request.resource.data.linkedUids
+        );
+      allow list, delete: if isAdmin();
+    }
+
+    match /user_access/{uid} {
+      allow get, create, update: if signedIn() && request.auth.uid == uid;
+      allow list, delete: if isAdmin();
+    }
+
+    match /license_keys/{key} {
+      allow get: if signedIn();
+      allow list, create, delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (
+          signedIn() &&
+          resource.data.usedByDeviceHash == '' &&
+          request.resource.data.usedByUid == request.auth.uid
+        );
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow get, create, update: if signedIn() && request.auth.uid == uid;
+      allow list, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
