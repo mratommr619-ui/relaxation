@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'firebase_options.dart';
@@ -151,44 +150,6 @@ class _StudioHomeState extends State<StudioHome> {
       _telegramMessageId.text = id.toString();
     });
     return true;
-  }
-
-  Future<void> _resolveTelegramWithIngest() async {
-    if (!_applyTelegramLink()) return;
-    final base = _ingestBaseUrl.text.trim().replaceAll(RegExp(r'/+$'), '');
-    if (base.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add Telethon ingest base URL first.')),
-      );
-      return;
-    }
-    setState(() => _saving = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final response = await http.post(
-        Uri.parse('$base/resolve'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'telegram_url': _telegramUrl.text.trim()}),
-      );
-      if (response.statusCode >= 400) {
-        throw Exception(response.body);
-      }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      setState(() {
-        _telegramChat.text = (data['chat'] ?? _telegramChat.text).toString();
-        _telegramMessageId.text = (data['messageId'] ?? _telegramMessageId.text)
-            .toString();
-        _streamUrl.text = (data['streamUrl'] ?? '').toString();
-        _downloadUrl.text = (data['downloadUrl'] ?? '').toString();
-      });
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Telethon stream/download links ready')),
-      );
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   Future<void> _save() async {
@@ -557,8 +518,6 @@ class _StudioHomeState extends State<StudioHome> {
                       }
                       return Column(
                         children: [
-                          const _AppSettingsPanel(),
-                          const SizedBox(height: 20),
                           Flex(
                             direction: wide ? Axis.horizontal : Axis.vertical,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,16 +530,8 @@ class _StudioHomeState extends State<StudioHome> {
                                   genre: _genre,
                                   quality: _quality,
                                   description: _description,
-                                  posterUrl: _posterUrl,
                                   posterBase64: _posterBase64,
-                                  streamUrl: _streamUrl,
-                                  downloadUrl: _downloadUrl,
-                                  watchLinks: _watchLinks,
-                                  downloadLinks: _downloadLinks,
                                   telegramUrl: _telegramUrl,
-                                  telegramChat: _telegramChat,
-                                  telegramMessageId: _telegramMessageId,
-                                  ingestBaseUrl: _ingestBaseUrl,
                                   episodesText: _episodesText,
                                   type: _type,
                                   saving: _saving,
@@ -589,7 +540,6 @@ class _StudioHomeState extends State<StudioHome> {
                                   onTypeChanged: _changeMediaType,
                                   onApplyTelegramLink: () =>
                                       _applyTelegramLink(),
-                                  onResolveTelegram: _resolveTelegramWithIngest,
                                   onSave: _save,
                                   onCancelEdit: _clearMediaForm,
                                   onPickPoster: _pickPosterImage,
@@ -1217,58 +1167,56 @@ class _ImageBase64Field extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFF5D6A7F)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 62,
-                height: 82,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1220),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF263247)),
-                ),
-                child: previewBytes == null
-                    ? Icon(
-                        hasImage
-                            ? Icons.broken_image_rounded
-                            : Icons.add_photo_alternate,
-                        color: const Color(0xFF4EE6A8),
-                      )
-                    : Image.memory(previewBytes, fit: BoxFit.cover),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 96,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1220),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF263247)),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      hasImage
-                          ? 'Image selected and converted to base64'
-                          : 'Choose an image. The app converts it automatically.',
-                      style: const TextStyle(
-                        color: Color(0xFFAAB4C8),
-                        fontSize: 12,
-                      ),
+                    child: previewBytes == null
+                        ? Icon(
+                            hasImage
+                                ? Icons.broken_image_rounded
+                                : Icons.add_photo_alternate,
+                            color: const Color(0xFF4EE6A8),
+                          )
+                        : Image.memory(previewBytes, fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hasImage ? 'Image ready' : 'No image selected',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFFAAB4C8)),
                     ),
-                  ],
-                ),
+                  ),
+                  if (hasImage)
+                    IconButton(
+                      tooltip: 'Clear image',
+                      onPressed: controller.clear,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                ],
               ),
-              if (hasImage)
-                IconButton(
-                  tooltip: 'Clear image',
-                  onPressed: controller.clear,
-                  icon: const Icon(Icons.close_rounded),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onPick,
+                  icon: const Icon(Icons.upload_rounded),
+                  label: const Text('Choose image'),
                 ),
-              FilledButton.icon(
-                onPressed: onPick,
-                icon: const Icon(Icons.upload_rounded),
-                label: const Text('Choose'),
               ),
             ],
           ),
@@ -1673,7 +1621,7 @@ class _StudioHeader extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Admin panel for Telegram media metadata',
+                    'Add movies and episodes with Telegram links',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Color(0xFFAAB4C8)),
@@ -1747,7 +1695,6 @@ class _LoginCardState extends State<_LoginCard> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _busy = false;
-  bool _creating = false;
 
   @override
   void dispose() {
@@ -1760,17 +1707,10 @@ class _LoginCardState extends State<_LoginCard> {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      if (_creating) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text,
-        );
-      } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text,
-        );
-      }
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
     } on FirebaseAuthException catch (error) {
       messenger.showSnackBar(
         SnackBar(
@@ -1820,13 +1760,6 @@ class _LoginCardState extends State<_LoginCard> {
             ),
             onSubmitted: (_) => _login(),
           ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _creating,
-            onChanged: (value) => setState(() => _creating = value),
-            title: const Text('Create admin account'),
-          ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
@@ -1834,11 +1767,7 @@ class _LoginCardState extends State<_LoginCard> {
               onPressed: _busy ? null : _login,
               icon: const Icon(Icons.login_rounded),
               label: Text(
-                _busy
-                    ? 'Please wait...'
-                    : _creating
-                    ? 'Create & sign in'
-                    : 'Sign in',
+                _busy ? 'Please wait...' : 'Sign in',
               ),
             ),
           ),
@@ -1875,16 +1804,8 @@ class _EditorCard extends StatelessWidget {
     required this.genre,
     required this.quality,
     required this.description,
-    required this.posterUrl,
     required this.posterBase64,
-    required this.streamUrl,
-    required this.downloadUrl,
-    required this.watchLinks,
-    required this.downloadLinks,
     required this.telegramUrl,
-    required this.telegramChat,
-    required this.telegramMessageId,
-    required this.ingestBaseUrl,
     required this.episodesText,
     required this.type,
     required this.saving,
@@ -1892,7 +1813,6 @@ class _EditorCard extends StatelessWidget {
     required this.firebaseReady,
     required this.onTypeChanged,
     required this.onApplyTelegramLink,
-    required this.onResolveTelegram,
     required this.onSave,
     required this.onCancelEdit,
     required this.onPickPoster,
@@ -1903,16 +1823,8 @@ class _EditorCard extends StatelessWidget {
   final TextEditingController genre;
   final TextEditingController quality;
   final TextEditingController description;
-  final TextEditingController posterUrl;
   final TextEditingController posterBase64;
-  final TextEditingController streamUrl;
-  final TextEditingController downloadUrl;
-  final TextEditingController watchLinks;
-  final TextEditingController downloadLinks;
   final TextEditingController telegramUrl;
-  final TextEditingController telegramChat;
-  final TextEditingController telegramMessageId;
-  final TextEditingController ingestBaseUrl;
   final TextEditingController episodesText;
   final String type;
   final bool saving;
@@ -1920,7 +1832,6 @@ class _EditorCard extends StatelessWidget {
   final bool firebaseReady;
   final ValueChanged<String> onTypeChanged;
   final VoidCallback onApplyTelegramLink;
-  final VoidCallback onResolveTelegram;
   final VoidCallback onSave;
   final VoidCallback onCancelEdit;
   final VoidCallback onPickPoster;
@@ -1978,11 +1889,9 @@ class _EditorCard extends StatelessWidget {
             const SizedBox(height: 12),
             _field(description, 'Description', maxLines: 3),
             const SizedBox(height: 12),
-            _field(posterUrl, 'Poster photo link'),
-            const SizedBox(height: 12),
             _ImageBase64Field(
               controller: posterBase64,
-              label: 'Poster image',
+              label: 'Poster',
               onPick: onPickPoster,
             ),
             const SizedBox(height: 12),
@@ -1999,61 +1908,12 @@ class _EditorCard extends StatelessWidget {
                   hintText: 'https://t.me/MagicChineseSeriesPage/18499',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
-                    tooltip: 'Parse link',
+                    tooltip: 'Check link',
                     onPressed: () => onApplyTelegramLink(),
-                    icon: const Icon(Icons.auto_fix_high_rounded),
+                    icon: const Icon(Icons.check_circle_rounded),
                   ),
                 ),
               ),
-            const SizedBox(height: 12),
-            _field(ingestBaseUrl, 'Telethon server URL (optional)'),
-            const SizedBox(height: 12),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('Advanced direct server links'),
-              subtitle: const Text(
-                'Optional: paste non-Telegram stream or download URLs here.',
-              ),
-              children: [
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: _field(streamUrl, 'Direct stream URL')),
-                    const SizedBox(width: 12),
-                    Expanded(child: _field(downloadUrl, 'Direct download URL')),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  watchLinks,
-                  'Extra stream links (one direct URL per line)',
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  downloadLinks,
-                  'Extra download links (one direct URL per line)',
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onResolveTelegram,
-                    icon: const Icon(Icons.cloud_sync_rounded),
-                    label: const Text('Test/resolve movie link'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _field(telegramChat, 'Telegram chat/channel')),
-                const SizedBox(width: 12),
-                Expanded(child: _field(telegramMessageId, 'Message ID')),
-              ],
-            ),
             const SizedBox(height: 16),
             Row(
               children: [
