@@ -647,7 +647,17 @@ class AccessStatusBar extends StatelessWidget {
         : 'Trial expired • Activate license';
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => showLicenseDialog(context, accessService),
+      onTap: () {
+        if (state == null || state!.trialExpiresAt == null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TelegramSignInScreen(access: accessService),
+            ),
+          );
+        } else {
+          showLicenseDialog(context, accessService);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
@@ -986,10 +996,11 @@ class _FeaturedSlider extends StatelessWidget {
     if (items.isEmpty) {
       return const SizedBox.shrink();
     }
+    final colors = Theme.of(context).colorScheme;
     return Column(
       children: [
         SizedBox(
-          height: 250,
+          height: 268,
           child: PageView.builder(
             controller: controller,
             onPageChanged: onChanged,
@@ -998,7 +1009,7 @@ class _FeaturedSlider extends StatelessWidget {
               final item = items[index];
               return AnimatedScale(
                 duration: const Duration(milliseconds: 280),
-                scale: currentIndex == index ? 1 : .94,
+                scale: currentIndex == index ? 1 : .93,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: FeaturedCard(
@@ -1024,8 +1035,8 @@ class _FeaturedSlider extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(99),
                 color: active
-                    ? const Color(0xFF33F0B0)
-                    : const Color(0xFF334057),
+                    ? colors.primary
+                    : colors.outlineVariant.withValues(alpha: .7),
               ),
             );
           }),
@@ -1049,23 +1060,22 @@ class FeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     return InkWell(
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(26),
       onTap: () => openDetails(context, item, accessState, accessService),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF182238), Color(0xFF101827), Color(0xFF172820)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: const Color(0xFF263247)),
-          boxShadow: const [
+          borderRadius: BorderRadius.circular(26),
+          color: colors.surface,
+          border: Border.all(color: colors.outlineVariant),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x77000000),
-              blurRadius: 26,
-              offset: Offset(0, 18),
+              color: Colors.black.withValues(alpha: dark ? .44 : .16),
+              blurRadius: dark ? 24 : 18,
+              offset: const Offset(0, 14),
             ),
           ],
         ),
@@ -1080,11 +1090,40 @@ class FeaturedCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withValues(alpha: .05),
-                      Colors.black.withValues(alpha: .78),
+                      Colors.black.withValues(alpha: dark ? .04 : .0),
+                      Colors.black.withValues(alpha: dark ? .38 : .18),
+                      Colors.black.withValues(alpha: dark ? .84 : .70),
                     ],
+                    stops: const [0, .48, 1],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              top: 18,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: .48),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .16),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    item.type.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -1101,6 +1140,7 @@ class FeaturedCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 28,
                       height: 1,
                       fontWeight: FontWeight.w900,
@@ -2300,7 +2340,15 @@ void openProtectedServerLink(
   AccessService accessService,
 ) async {
   if (state?.hasAccess != true) {
-    showLicenseDialog(context, accessService);
+    if (state == null || state.trialExpiresAt == null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TelegramSignInScreen(access: accessService),
+        ),
+      );
+    } else {
+      showLicenseDialog(context, accessService);
+    }
     return;
   }
   var targetUrl = url;

@@ -1081,6 +1081,15 @@ class _GenreOrderPanel extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _seedDefaultGenres(context),
+              icon: const Icon(Icons.playlist_add_check_rounded),
+              label: const Text('Add default genre list'),
+            ),
+          ),
           const SizedBox(height: 14),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
@@ -1129,6 +1138,20 @@ class _GenreOrderPanel extends StatelessWidget {
                                 doc.reference.update({'visible': value}),
                           ),
                           IconButton(
+                            tooltip: 'Move up',
+                            icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                            onPressed: index == 0
+                                ? null
+                                : () => _moveGenre(docs, index, -1),
+                          ),
+                          IconButton(
+                            tooltip: 'Move down',
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                            onPressed: index == docs.length - 1
+                                ? null
+                                : () => _moveGenre(docs, index, 1),
+                          ),
+                          IconButton(
                             tooltip: 'Rename',
                             icon: const Icon(Icons.edit_rounded),
                             onPressed: () => _showTextUpdateDialog(
@@ -1158,6 +1181,54 @@ class _GenreOrderPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _moveGenre(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    int index,
+    int delta,
+  ) async {
+    final targetIndex = index + delta;
+    if (targetIndex < 0 || targetIndex >= docs.length) return;
+    final reordered = [...docs];
+    final item = reordered.removeAt(index);
+    reordered.insert(targetIndex, item);
+    final batch = FirebaseFirestore.instance.batch();
+    for (var i = 0; i < reordered.length; i++) {
+      batch.update(reordered[i].reference, {
+        'order': i,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
+  Future<void> _seedDefaultGenres(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final collection = FirebaseFirestore.instance.collection('genre_sections');
+    final existing = await collection.get();
+    final existingIds = existing.docs.map((doc) => doc.id).toSet();
+    final batch = FirebaseFirestore.instance.batch();
+    var added = 0;
+    for (var i = 0; i < _defaultGenreChoices.length; i++) {
+      final title = _defaultGenreChoices[i];
+      if (existingIds.contains(title)) continue;
+      batch.set(collection.doc(title), {
+        'title': title,
+        'order': i,
+        'visible': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      added++;
+    }
+    if (added == 0) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Genres already exist')),
+      );
+      return;
+    }
+    await batch.commit();
+    messenger.showSnackBar(SnackBar(content: Text('Added $added genres')));
   }
 }
 
@@ -2378,9 +2449,7 @@ class _GenreMultiPicker extends StatelessWidget {
                 .where((title) => title.trim().isNotEmpty)
                 .toList() ??
             const <String>[];
-        final choices = genres.isEmpty
-            ? const ['Latest Movies', 'Latest Series', 'Action', 'Drama']
-            : genres;
+        final choices = genres.isEmpty ? _defaultGenreChoices : genres;
         final available = choices
             .where((genre) => !selectedGenres.contains(genre))
             .toList();
@@ -2560,6 +2629,44 @@ BoxDecoration _panelDecoration() {
     border: Border.all(color: const Color(0xFF263247)),
   );
 }
+
+const _defaultGenreChoices = [
+  'Latest Movies',
+  'Latest Series',
+  'Ongoing Series',
+  'Completed Series',
+  'Action',
+  'Adventure',
+  'Animation',
+  'Biography',
+  'Comedy',
+  'Crime',
+  'Documentary',
+  'Drama',
+  'Family',
+  'Fantasy',
+  'Historical',
+  'Horror',
+  'Investigation',
+  'Martial Arts',
+  'Medical',
+  'Mystery',
+  'Political',
+  'Romance',
+  'Sci-Fi',
+  'Sport',
+  'Supernatural',
+  'Thriller',
+  'War',
+  'Western',
+  'Chinese',
+  'Korean',
+  'Thai',
+  'Japanese',
+  'Indian',
+  'Hollywood',
+  'Myanmar',
+];
 
 class TelegramPostRef {
   const TelegramPostRef({required this.chat, required this.messageId});
