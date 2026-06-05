@@ -48,8 +48,9 @@ app.*.map.json
 /android/app/release
 
 # Firebase / Telegram secrets
+*service-account*.json
 *-adminsdk-*.json
-service-account*.json
+firebase-service-account.json
 .firebase_generated_configs.json
 .env
 *.session
