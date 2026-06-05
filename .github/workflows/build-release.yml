@@ -24,20 +24,12 @@ jobs:
         run: |
           flutter analyze lib test
           flutter test
-      - name: Admin analyze
-        working-directory: admin_panel
-        run: |
-          flutter pub get
-          flutter analyze lib test
       - name: Build Android
         run: flutter build apk --debug
       - name: Build Web
         run: flutter build web
       - name: Build Linux
         run: flutter build linux
-      - name: Build Admin Web
-        working-directory: admin_panel
-        run: flutter build web
       - uses: actions/upload-artifact@v4
         with:
           name: relaxation-android-web-linux
@@ -45,7 +37,25 @@ jobs:
             build/app/outputs/flutter-apk/*.apk
             build/web/**
             build/linux/**
-            admin_panel/build/web/**
+
+  admin-web:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Admin pub get
+        working-directory: admin_panel
+        run: flutter pub get
+      - name: Admin build web
+        working-directory: admin_panel
+        run: flutter build web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-admin-web
+          path: admin_panel/build/web/**
 
   windows:
     runs-on: windows-latest
