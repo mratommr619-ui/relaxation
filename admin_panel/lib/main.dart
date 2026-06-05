@@ -97,6 +97,128 @@ class _StudioHomeState extends State<StudioHome> {
   String? _editingAdId;
   bool _saving = false;
 
+  void _openSection(_AdminSection section) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => StatefulBuilder(
+          builder: (context, refreshPage) => _AdminSectionPage(
+            section: section,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 920;
+                return _sectionContent(section, wide, refreshPage);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionContent(
+    _AdminSection section,
+    bool wide,
+    StateSetter refreshPage,
+  ) {
+    switch (section) {
+      case _AdminSection.media:
+        final editor = _EditorCard(
+          formKey: _formKey,
+          title: _title,
+          genre: _genre,
+          quality: _quality,
+          description: _description,
+          posterBase64: _posterBase64,
+          telegramUrl: _telegramUrl,
+          episodesText: _episodesText,
+          type: _type,
+          saving: _saving,
+          editing: _editingMediaId != null,
+          firebaseReady: widget.firebaseReady,
+          onTypeChanged: (value) {
+            _changeMediaType(value);
+            refreshPage(() {});
+          },
+          onApplyTelegramLink: () => _applyTelegramLink(),
+          onSave: () {
+            refreshPage(() {});
+            _save().whenComplete(() => refreshPage(() {}));
+          },
+          onCancelEdit: () {
+            _clearMediaForm();
+            refreshPage(() {});
+          },
+          onPickPoster: _pickPosterImage,
+        );
+        final library = _LibraryPanel(
+          firebaseReady: true,
+          onEdit: (doc) {
+            _editMedia(doc);
+            refreshPage(() {});
+          },
+        );
+        if (!wide) {
+          return Column(
+            children: [editor, const SizedBox(height: 20), library],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: editor),
+            const SizedBox(width: 20),
+            Expanded(flex: 4, child: library),
+          ],
+        );
+      case _AdminSection.licenses:
+        return _LicensePanel(
+          nameController: _licenseName,
+          daysController: _licenseDays,
+          onCreate: _createLicense,
+        );
+      case _AdminSection.genres:
+        return _GenreOrderPanel(titleController: _genreTitle, onAdd: _addGenre);
+      case _AdminSection.ads:
+        return _AdsPanel(
+          titleController: _adTitle,
+          subtitleController: _adSubtitle,
+          imageUrlController: _adImageUrl,
+          imageBase64Controller: _adImageBase64,
+          actionUrlController: _adActionUrl,
+          editing: _editingAdId != null,
+          onSave: () {
+            _saveAd().whenComplete(() => refreshPage(() {}));
+            refreshPage(() {});
+          },
+          onCancel: () {
+            setState(() {
+              _editingAdId = null;
+              _adTitle.clear();
+              _adSubtitle.clear();
+              _adImageUrl.clear();
+              _adImageBase64.clear();
+              _adActionUrl.clear();
+            });
+            refreshPage(() {});
+          },
+          onEdit: (doc) {
+            _editAd(doc);
+            refreshPage(() {});
+          },
+          onPickImage: _pickAdImage,
+        );
+      case _AdminSection.notifications:
+        return _NotificationPanel(
+          titleController: _notiTitle,
+          bodyController: _notiBody,
+          photoUrlController: _notiPhotoUrl,
+          linkController: _notiLink,
+          mediaIdController: _notiMediaId,
+          onSend: _sendAdminNotification,
+        );
+    }
+  }
+
   @override
   void dispose() {
     _title.dispose();
@@ -516,90 +638,7 @@ class _StudioHomeState extends State<StudioHome> {
                       if (authSnapshot.data == null) {
                         return const _LoginCard();
                       }
-                      return Column(
-                        children: [
-                          Flex(
-                            direction: wide ? Axis.horizontal : Axis.vertical,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                flex: wide ? 5 : 0,
-                                child: _EditorCard(
-                                  formKey: _formKey,
-                                  title: _title,
-                                  genre: _genre,
-                                  quality: _quality,
-                                  description: _description,
-                                  posterBase64: _posterBase64,
-                                  telegramUrl: _telegramUrl,
-                                  episodesText: _episodesText,
-                                  type: _type,
-                                  saving: _saving,
-                                  editing: _editingMediaId != null,
-                                  firebaseReady: widget.firebaseReady,
-                                  onTypeChanged: _changeMediaType,
-                                  onApplyTelegramLink: () =>
-                                      _applyTelegramLink(),
-                                  onSave: _save,
-                                  onCancelEdit: _clearMediaForm,
-                                  onPickPoster: _pickPosterImage,
-                                ),
-                              ),
-                              SizedBox(
-                                width: wide ? 20 : 0,
-                                height: wide ? 0 : 20,
-                              ),
-                              Expanded(
-                                flex: wide ? 4 : 0,
-                                child: _LibraryPanel(
-                                  firebaseReady: true,
-                                  onEdit: _editMedia,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          _LicensePanel(
-                            nameController: _licenseName,
-                            daysController: _licenseDays,
-                            onCreate: _createLicense,
-                          ),
-                          const SizedBox(height: 20),
-                          _GenreOrderPanel(
-                            titleController: _genreTitle,
-                            onAdd: _addGenre,
-                          ),
-                          const SizedBox(height: 20),
-                          _AdsPanel(
-                            titleController: _adTitle,
-                            subtitleController: _adSubtitle,
-                            imageUrlController: _adImageUrl,
-                            imageBase64Controller: _adImageBase64,
-                            actionUrlController: _adActionUrl,
-                            editing: _editingAdId != null,
-                            onSave: _saveAd,
-                            onCancel: () => setState(() {
-                              _editingAdId = null;
-                              _adTitle.clear();
-                              _adSubtitle.clear();
-                              _adImageUrl.clear();
-                              _adImageBase64.clear();
-                              _adActionUrl.clear();
-                            }),
-                            onEdit: _editAd,
-                            onPickImage: _pickAdImage,
-                          ),
-                          const SizedBox(height: 20),
-                          _NotificationPanel(
-                            titleController: _notiTitle,
-                            bodyController: _notiBody,
-                            photoUrlController: _notiPhotoUrl,
-                            linkController: _notiLink,
-                            mediaIdController: _notiMediaId,
-                            onSend: _sendAdminNotification,
-                          ),
-                        ],
-                      );
+                      return _AdminDashboard(wide: wide, onOpen: _openSection);
                     },
                   ),
               ],
@@ -607,6 +646,204 @@ class _StudioHomeState extends State<StudioHome> {
           },
         ),
       ),
+    );
+  }
+}
+
+enum _AdminSection {
+  media(
+    title: 'Media',
+    subtitle: 'Add movies, series episodes, posters, and Telegram links.',
+    icon: Icons.video_library_rounded,
+  ),
+  licenses(
+    title: 'License Keys',
+    subtitle: 'Create keys and separate no use keys from used keys.',
+    icon: Icons.key_rounded,
+  ),
+  genres(
+    title: 'Genre Order',
+    subtitle: 'Arrange user app sections and hide or show genres.',
+    icon: Icons.sort_rounded,
+  ),
+  ads(
+    title: 'Ads',
+    subtitle: 'Create and edit banners shown in the user app.',
+    icon: Icons.campaign_rounded,
+  ),
+  notifications(
+    title: 'Notifications',
+    subtitle: 'Send title, body, photo, link, or media deeplink.',
+    icon: Icons.notifications_active_rounded,
+  );
+
+  const _AdminSection({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+}
+
+class _AdminDashboard extends StatelessWidget {
+  const _AdminDashboard({required this.wide, required this.onOpen});
+
+  final bool wide;
+  final ValueChanged<_AdminSection> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = _AdminSection.values;
+    if (!wide) {
+      return Column(
+        children: [
+          for (final section in sections) ...[
+            _AdminSectionCard(section: section, onOpen: () => onOpen(section)),
+            if (section != sections.last) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sections.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 2.8,
+      ),
+      itemBuilder: (context, index) {
+        final section = sections[index];
+        return _AdminSectionCard(
+          section: section,
+          onOpen: () => onOpen(section),
+        );
+      },
+    );
+  }
+}
+
+class _AdminSectionCard extends StatelessWidget {
+  const _AdminSectionCard({required this.section, required this.onOpen});
+
+  final _AdminSection section;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _panelDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C2A3D),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(section.icon, color: const Color(0xFF4EE6A8)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  section.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  section.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFAAB4C8)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            onPressed: onOpen,
+            icon: const Icon(Icons.arrow_forward_rounded),
+            label: const Text('More'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminSectionPage extends StatelessWidget {
+  const _AdminSectionPage({required this.section, required this.child});
+
+  final _AdminSection section;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(section.title),
+        backgroundColor: const Color(0xFF080B12),
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            _SectionTitle(section: section),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.section});
+
+  final _AdminSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(section.icon, color: const Color(0xFF4EE6A8)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                section.title,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                section.subtitle,
+                style: const TextStyle(color: Color(0xFFAAB4C8)),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1041,7 +1278,8 @@ class _LicenseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = doc.data();
-    final used = (data['usedByDeviceHash'] ?? '').toString().isNotEmpty ||
+    final used =
+        (data['usedByDeviceHash'] ?? '').toString().isNotEmpty ||
         (data['usedByUid'] ?? '').toString().isNotEmpty;
     final note = (data['name'] ?? '').toString();
     final usedBy = (data['usedByEmail'] ?? data['usedByUid'] ?? '').toString();
@@ -1843,9 +2081,7 @@ class _LoginCardState extends State<_LoginCard> {
             child: FilledButton.icon(
               onPressed: _busy ? null : _login,
               icon: const Icon(Icons.login_rounded),
-              label: Text(
-                _busy ? 'Please wait...' : 'Sign in',
-              ),
+              label: Text(_busy ? 'Please wait...' : 'Sign in'),
             ),
           ),
         ],
