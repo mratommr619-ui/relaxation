@@ -559,30 +559,15 @@ class _StudioHomeState extends State<StudioHome> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          Flex(
-                            direction: wide ? Axis.horizontal : Axis.vertical,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                flex: wide ? 5 : 0,
-                                child: _GenreOrderPanel(
-                                  titleController: _genreTitle,
-                                  onAdd: _addGenre,
-                                ),
-                              ),
-                              SizedBox(
-                                width: wide ? 20 : 0,
-                                height: wide ? 0 : 20,
-                              ),
-                              Expanded(
-                                flex: wide ? 4 : 0,
-                                child: _LicensePanel(
-                                  nameController: _licenseName,
-                                  daysController: _licenseDays,
-                                  onCreate: _createLicense,
-                                ),
-                              ),
-                            ],
+                          _LicensePanel(
+                            nameController: _licenseName,
+                            daysController: _licenseDays,
+                            onCreate: _createLicense,
+                          ),
+                          const SizedBox(height: 20),
+                          _GenreOrderPanel(
+                            titleController: _genreTitle,
+                            onAdd: _addGenre,
                           ),
                           const SizedBox(height: 20),
                           _AdsPanel(
@@ -920,37 +905,45 @@ class _LicensePanel extends StatelessWidget {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Owner / note',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: daysController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Days',
-              border: OutlineInputBorder(),
-            ),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Owner / note',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: daysController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Days',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: onCreate,
-              icon: const Icon(Icons.key_rounded),
+              icon: const Icon(Icons.add_rounded),
               label: const Text('Create license key'),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('license_keys')
                 .orderBy('createdAt', descending: true)
-                .limit(12)
                 .snapshots(),
             builder: (context, snapshot) {
               final docs = snapshot.data?.docs ?? [];
@@ -960,48 +953,132 @@ class _LicensePanel extends StatelessWidget {
                   style: TextStyle(color: Color(0xFFAAB4C8)),
                 );
               }
+              final unused = docs.where((doc) => !_licenseUsed(doc)).toList();
+              final used = docs.where(_licenseUsed).toList();
               return Column(
-                children: docs.map((doc) {
-                  final data = doc.data();
-                  final used = (data['usedByDeviceHash'] ?? '')
-                      .toString()
-                      .isNotEmpty;
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      used ? Icons.lock_rounded : Icons.key_rounded,
-                    ),
-                    title: Text(doc.id),
-                    subtitle: Text(
-                      '${data['days'] ?? 0} days • ${used ? 'used' : 'unused'}',
-                    ),
-                    trailing: Wrap(
-                      spacing: 4,
-                      children: [
-                        IconButton(
-                          tooltip: 'Edit note',
-                          icon: const Icon(Icons.edit_rounded),
-                          onPressed: () => _showTextUpdateDialog(
-                            context,
-                            title: 'Edit license note',
-                            initialValue: (data['name'] ?? '').toString(),
-                            onSave: (value) => doc.reference.update({
-                              'name': value,
-                              'updatedAt': FieldValue.serverTimestamp(),
-                            }),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Delete',
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          onPressed: used ? null : () => doc.reference.delete(),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _LicenseGroup(
+                    title: 'No use keys',
+                    icon: Icons.key_rounded,
+                    emptyText: 'No unused keys.',
+                    docs: unused,
+                  ),
+                  const SizedBox(height: 14),
+                  _LicenseGroup(
+                    title: 'Used keys',
+                    icon: Icons.lock_rounded,
+                    emptyText: 'No used keys yet.',
+                    docs: used,
+                  ),
+                ],
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _licenseUsed(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return (data['usedByDeviceHash'] ?? '').toString().isNotEmpty ||
+        (data['usedByUid'] ?? '').toString().isNotEmpty;
+  }
+}
+
+class _LicenseGroup extends StatelessWidget {
+  const _LicenseGroup({
+    required this.title,
+    required this.icon,
+    required this.emptyText,
+    required this.docs,
+  });
+
+  final String title;
+  final IconData icon;
+  final String emptyText;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1422),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF263247)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFF4EE6A8)),
+              const SizedBox(width: 8),
+              Text(
+                '$title (${docs.length})',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (docs.isEmpty)
+            Text(emptyText, style: const TextStyle(color: Color(0xFFAAB4C8)))
+          else
+            ...docs.map((doc) => _LicenseTile(doc: doc)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LicenseTile extends StatelessWidget {
+  const _LicenseTile({required this.doc});
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data();
+    final used = (data['usedByDeviceHash'] ?? '').toString().isNotEmpty ||
+        (data['usedByUid'] ?? '').toString().isNotEmpty;
+    final note = (data['name'] ?? '').toString();
+    final usedBy = (data['usedByEmail'] ?? data['usedByUid'] ?? '').toString();
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: SelectableText(
+        doc.id,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text(
+        [
+          '${data['days'] ?? 0} days',
+          if (note.isNotEmpty) note,
+          if (used && usedBy.isNotEmpty) 'used by $usedBy',
+        ].join(' • '),
+      ),
+      trailing: Wrap(
+        spacing: 4,
+        children: [
+          IconButton(
+            tooltip: 'Edit note',
+            icon: const Icon(Icons.edit_rounded),
+            onPressed: () => _showTextUpdateDialog(
+              context,
+              title: 'Edit license note',
+              initialValue: note,
+              onSave: (value) => doc.reference.update({
+                'name': value,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Delete unused key',
+            icon: const Icon(Icons.delete_outline_rounded),
+            onPressed: used ? null : () => doc.reference.delete(),
           ),
         ],
       ),
