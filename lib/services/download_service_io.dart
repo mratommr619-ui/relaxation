@@ -25,10 +25,10 @@ class DownloadService {
     if (kIsWeb) {
       throw const DownloadException('Downloads are not supported on web.');
     }
-    if (Platform.isAndroid) {
-      await _ensurePermission();
-    }
-    final dir = await _downloadDirectory();
+    final usePublicDownloads = Platform.isAndroid
+        ? await _ensurePermission()
+        : true;
+    final dir = await _downloadDirectory(usePublicDownloads);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
@@ -69,8 +69,13 @@ class DownloadService {
     await prefs.remove(_historyKey);
   }
 
-  Future<Directory> _downloadDirectory() async {
+  Future<Directory> _downloadDirectory(bool usePublicDownloads) async {
     if (Platform.isAndroid) {
+      if (!usePublicDownloads) {
+        return Directory(
+          '/storage/emulated/0/Android/data/com.mratom.relaxation/files/Download/Relaxation',
+        );
+      }
       return Directory('/storage/emulated/0/Download/Relaxation');
     }
     final home =
@@ -82,7 +87,7 @@ class DownloadService {
     );
   }
 
-  Future<void> _ensurePermission() async {
+  Future<bool> _ensurePermission() async {
     final notification = await Permission.notification.status;
     if (notification.isDenied) {
       await Permission.notification.request();
@@ -92,17 +97,13 @@ class DownloadService {
     if (storage.isDenied) {
       storage = await Permission.storage.request();
     }
-    if (storage.isGranted) return;
+    if (storage.isGranted) return true;
 
     var manage = await Permission.manageExternalStorage.status;
     if (manage.isDenied) {
       manage = await Permission.manageExternalStorage.request();
     }
-    if (!manage.isGranted) {
-      throw const DownloadException(
-        'Storage permission denied. Allow file access to save downloads.',
-      );
-    }
+    return manage.isGranted;
   }
 
   String _fileNameFromUrl(String url, String title) {

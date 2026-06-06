@@ -2611,18 +2611,38 @@ void openProtectedServerLink(
   AccessState? state,
   AccessService accessService,
 ) async {
-  if (state?.hasAccess != true) {
-    if (state == null || state.trialExpiresAt == null) {
-      Navigator.of(context).push(
+  var currentState = state;
+  try {
+    currentState = await accessService.ensureCurrentAccess();
+  } catch (_) {
+    currentState = state;
+  }
+  if (!context.mounted) return;
+
+  if (currentState?.hasAccess != true) {
+    if (currentState == null || currentState.trialExpiresAt == null) {
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => TelegramSignInScreen(access: accessService),
         ),
       );
+      if (!context.mounted) return;
+      try {
+        currentState = await accessService.ensureCurrentAccess();
+      } catch (_) {
+        currentState = null;
+      }
+      if (currentState?.hasAccess == true) {
+        // Continue the original watch/download tap after successful sign-in.
+      } else {
+        return;
+      }
     } else {
       showLicenseDialog(context, accessService);
+      return;
     }
-    return;
   }
+  if (!context.mounted) return;
   var targetUrl = url;
   if (_isTelegramWebUrl(targetUrl)) {
     final resolved = await resolveTelegramOnDemand(
