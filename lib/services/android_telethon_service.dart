@@ -73,7 +73,7 @@ class AndroidTelethonService {
     final downloadUrl = (data['downloadUrl'] ?? '').toString();
     if (streamUrl.isEmpty || downloadUrl.isEmpty) {
       throw const TelethonResolveException(
-        'Telegram login is working on Android, but playback needs a direct/cached video URL.',
+        'Login is working, but playback needs a playable video URL.',
       );
     }
     return ResolvedTelegramMedia(

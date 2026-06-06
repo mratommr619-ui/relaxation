@@ -68,7 +68,9 @@ service cloud.firestore {
       match /devices/{deviceHash} {
         allow get, create, update: if signedIn() &&
           request.resource.data.uid == request.auth.uid;
-        allow list, update: if signedIn();
+        allow list: if signedIn();
+        allow update: if signedIn() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kickedAt']);
         allow delete: if isAdmin();
       }
     }

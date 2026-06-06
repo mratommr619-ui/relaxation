@@ -173,16 +173,16 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
 
   Future<void> _sendCode() async {
     if (_phone.text.trim().length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your Telegram phone number.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter your phone number.')));
       return;
     }
     await _runBusy(() async {
       await _telegramAuth.sendCode(_phone.text);
       _code.clear();
       setState(() => _step = _TelegramLoginStep.code);
-      _showMessage('Telegram code sent. Use the newest code.');
+      _showMessage('Login code sent. Use the newest code.');
     });
   }
 
@@ -192,7 +192,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
     if (_code.text.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Enter the Telegram code.')));
+      ).showSnackBar(const SnackBar(content: Text('Enter the login code.')));
       return;
     }
     await _runBusy(() async {
@@ -210,9 +210,9 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
 
   Future<void> _verifyPassword() async {
     if (_password.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your Telegram 2FA password.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter your 2FA password.')));
       return;
     }
     await _runBusy(() async {
@@ -232,8 +232,14 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
       displayName: telegram.displayName,
     );
     await widget.access.startTrialAfterTelegramLogin();
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+      );
     }
   }
 
@@ -260,22 +266,23 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
       _code.clear();
       if (mounted) setState(() => _step = _TelegramLoginStep.code);
       _showMessage(
-        'Telegram code expired. Tap Resend code and use the newest code.',
+        'Login code expired. Tap Resend code and use the newest code.',
       );
       return true;
     }
     if (message.contains('phonecodeinvaliderror') ||
         message.contains('invalid code')) {
       _code.clear();
-      _showMessage(
-        'Invalid Telegram code. Check the newest code and try again.',
-      );
+      _showMessage('Invalid login code. Check the newest code and try again.');
       return true;
     }
     return false;
   }
 
   String _friendlyTelegramError(Object error) {
+    if (error is FirebaseException && error.code == 'permission-denied') {
+      return 'Sign-in completed, but access could not be saved. Please try again.';
+    }
     final message = error.toString();
     if (message.contains('ANDROID_TELETHON')) {
       return message
@@ -361,7 +368,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Telegram Login',
+                                  'Account Login',
                                   style: TextStyle(
                                     fontSize: 28,
                                     height: 1,
@@ -380,7 +387,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                       ),
                       const SizedBox(height: 18),
                       const Text(
-                        'No Gmail login required. We use your Telegram session only to open public channel videos inside the app.',
+                        'No Gmail login required. Sign in once to start your trial and play videos securely inside the app.',
                         style: TextStyle(
                           color: Color(0xFFB8C4D8),
                           height: 1.45,
@@ -394,7 +401,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                           controller: _phone,
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
-                            labelText: 'Telegram phone number',
+                            labelText: 'Phone number',
                             hintText: '+959...',
                             prefixIcon: Icon(Icons.phone_rounded),
                             border: OutlineInputBorder(),
@@ -406,7 +413,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                           controller: _code,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Telegram code',
+                            labelText: 'Login code',
                             prefixIcon: Icon(Icons.sms_rounded),
                             border: OutlineInputBorder(),
                           ),
@@ -435,7 +442,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                         ),
                       ] else ...[
                         const Text(
-                          'Two-step verification is enabled. Enter your Telegram cloud password to finish login.',
+                          'Two-step verification is enabled. Enter your cloud password to finish login.',
                           style: TextStyle(
                             color: Color(0xFFB8C4D8),
                             height: 1.4,
@@ -446,7 +453,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                           controller: _password,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            labelText: 'Telegram 2FA password',
+                            labelText: '2FA password',
                             prefixIcon: Icon(Icons.lock_rounded),
                             border: OutlineInputBorder(),
                           ),
@@ -473,7 +480,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                             _busy
                                 ? 'Please wait...'
                                 : _step == _TelegramLoginStep.phone
-                                ? 'Send Telegram Code'
+                                ? 'Send Login Code'
                                 : _step == _TelegramLoginStep.code
                                 ? 'Verify Code'
                                 : 'Verify Password',
@@ -482,7 +489,7 @@ class _TelegramSignInScreenState extends State<TelegramSignInScreen> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'If a code expires, tap Resend code and enter the newest Telegram message code.',
+                        'If a code expires, tap Resend code and enter the newest login code.',
                         style: TextStyle(
                           color: Color(0xFF91A1BC),
                           fontSize: 12,
@@ -827,7 +834,7 @@ class AccessStatusBar extends StatelessWidget {
               ? 'Premium active • ${state!.daysLeft} days left'
               : 'Free trial • ${state!.daysLeft} days left'
         : state!.trialExpiresAt == null
-        ? 'Login with Telegram to start 3-day trial'
+        ? 'Sign in to start 3-day trial'
         : 'Trial expired • Activate license';
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -970,9 +977,9 @@ class RelaxationDrawer extends StatelessWidget {
                   Icons.support_agent_rounded,
                   color: Color(0xFF33F0B0),
                 ),
-                title: const Text('Contact to admin'),
+                title: const Text('Contact admin'),
                 subtitle: const Text(
-                  'Telegram message: Relaxation',
+                  'Support message: Relaxation',
                   style: TextStyle(color: Color(0xFF91A1BC)),
                 ),
                 onTap: () => openAdminContact(),
@@ -2676,9 +2683,7 @@ Future<ResolvedTelegramMedia?> resolveTelegramOnDemand(
         final message = error.toString();
         if (message.contains('login') || message.contains('Session')) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please login with Telegram to continue.'),
-            ),
+            const SnackBar(content: Text('Please sign in to continue.')),
           );
           Navigator.of(context).push(
             MaterialPageRoute(

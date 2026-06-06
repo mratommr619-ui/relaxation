@@ -53,7 +53,7 @@ class LocalTelethonService {
     }
     if (!config.hasApiCredentials || (requireSession && !config.isUsable)) {
       throw const LocalTelethonException(
-        'Telegram API ID, API hash, or session string is missing.',
+        'Playback login settings are missing.',
       );
     }
     final current = _baseUrl;

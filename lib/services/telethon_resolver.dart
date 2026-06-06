@@ -21,10 +21,10 @@ class TelethonResolver {
   }) async {
     final base = ingestBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     if (base.isEmpty) {
-      throw const TelethonResolveException('Telethon ingest URL is missing.');
+      throw const TelethonResolveException('Playback server URL is missing.');
     }
     if (telegramUrl.trim().isEmpty) {
-      throw const TelethonResolveException('Telegram source link is missing.');
+      throw const TelethonResolveException('Video source link is missing.');
     }
     final response = await _dio.post<Map<String, dynamic>>(
       '$base/resolve',
@@ -35,7 +35,7 @@ class TelethonResolver {
     final downloadUrl = (data['downloadUrl'] ?? '').toString();
     if (streamUrl.isEmpty || downloadUrl.isEmpty) {
       throw const TelethonResolveException(
-        'Telethon did not return stream links.',
+        'Playback server did not return stream links.',
       );
     }
     return ResolvedTelegramMedia(
