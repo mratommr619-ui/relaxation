@@ -195,6 +195,7 @@ class AccessService {
         : phone.trim().replaceAll(RegExp(r'\D+'), '');
     if (accountKey.isEmpty) return;
     final deviceHash = await currentDeviceHash();
+    await ensureDeviceAccess(user, deviceHash);
     final now = Timestamp.now();
     final accountRef = firestore
         .collection('telegram_accounts')
@@ -218,9 +219,12 @@ class AccessService {
         'createdAt': now,
       }, SetOptions(merge: true));
       transaction.set(deviceRef, {
+        'deviceHash': deviceHash,
         'telegramAccountKey': accountKey,
         'telegramPhone': phone,
         'telegramDisplayName': displayName,
+        'lastUid': user.uid,
+        'lastEmail': user.email ?? '',
         'disabled': false,
         'lastSeenAt': now,
       }, SetOptions(merge: true));
@@ -248,8 +252,9 @@ class AccessService {
       batch.set(
         firestore.collection('access_devices').doc(doc.id),
         {
+          'deviceHash': doc.id,
           'disabled': true,
-          'disabledReason': 'Telegram account reached the 2-device limit.',
+          'disabledReason': 'This account is already active on 2 devices.',
           'disabledAt': Timestamp.now(),
         },
         SetOptions(merge: true),
