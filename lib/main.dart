@@ -827,17 +827,29 @@ class AccessStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final active = state?.hasAccess == true;
     final text = state == null
         ? 'Checking access...'
-        : state!.hasAccess
+        : active
         ? state!.isPremium
               ? 'Premium active • ${state!.daysLeft} days left'
-              : 'Free trial • ${state!.daysLeft} days left'
+              : 'Free trial active • ${state!.daysLeft} days left'
         : state!.trialExpiresAt == null
         ? 'Sign in to start 3-day trial'
         : 'Trial expired • Activate license';
+    final subtitle = state == null
+        ? 'Please wait'
+        : active
+        ? (state!.expiryDate == null
+              ? 'Active now'
+              : 'Expires ${formatDate(state!.expiryDate!)}')
+        : state!.trialExpiresAt == null
+        ? 'Trial starts after account login'
+        : 'License required';
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(22),
       onTap: () {
         if (state == null || state!.trialExpiresAt == null) {
           Navigator.of(context).push(
@@ -850,25 +862,76 @@ class AccessStatusBar extends StatelessWidget {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: const Color(0xFF101827),
-          border: Border.all(color: const Color(0xFF263247)),
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            colors: active
+                ? dark
+                      ? [const Color(0xFF0E2C27), const Color(0xFF102032)]
+                      : [const Color(0xFFE2FFF4), const Color(0xFFEAF2FF)]
+                : dark
+                ? [const Color(0xFF171D2C), const Color(0xFF101827)]
+                : [const Color(0xFFFFF8E7), const Color(0xFFEFF5FF)],
+          ),
+          border: Border.all(
+            color: active
+                ? colors.primary.withValues(alpha: .45)
+                : colors.outlineVariant,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? .22 : .08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(
-              state?.hasAccess == true
-                  ? Icons.verified_rounded
-                  : Icons.lock_clock_rounded,
-              color: state?.hasAccess == true
-                  ? const Color(0xFF33F0B0)
-                  : const Color(0xFFFFC857),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: active
+                    ? colors.primary.withValues(alpha: .16)
+                    : const Color(0xFFFFC857).withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                active ? Icons.verified_rounded : Icons.lock_clock_rounded,
+                color: active ? colors.primary : const Color(0xFFB97800),
+              ),
             ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(text)),
-            const Icon(Icons.key_rounded, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurface,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.key_rounded, size: 18, color: colors.onSurfaceVariant),
           ],
         ),
       ),
@@ -891,6 +954,24 @@ class RelaxationDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = firebaseReady ? accessService.auth.currentUser : null;
+    final accountName = accessState == null
+        ? 'Checking...'
+        : accessState!.hasTelegramLogin
+        ? (accessState!.telegramDisplayName.trim().isNotEmpty
+              ? accessState!.telegramDisplayName.trim()
+              : accessState!.telegramPhone.trim())
+        : firebaseReady
+        ? 'Not connected'
+        : 'Demo mode';
+    final accessLabel = accessState == null
+        ? 'Checking...'
+        : accessState!.hasAccess
+        ? accessState!.isPremium
+              ? 'Premium • ${accessState!.daysLeft} days left'
+              : 'Free trial • ${accessState!.daysLeft} days left'
+        : accessState!.trialExpiresAt == null
+        ? 'Trial not started'
+        : 'Trial expired';
     final expireDate = accessState == null
         ? 'Checking...'
         : accessState!.expiryDate == null
@@ -900,111 +981,128 @@ class RelaxationDrawer extends StatelessWidget {
         : formatDate(accessState!.expiryDate!);
     return Drawer(
       backgroundColor: const Color(0xFF080D18),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF33F0B0), Color(0xFF5B8DEF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x6633F0B0), blurRadius: 30),
+      child: IconTheme(
+        data: const IconThemeData(color: Color(0xFFEAF2FF)),
+        child: DefaultTextStyle(
+          style: const TextStyle(color: Color(0xFFEAF2FF)),
+          child: ListTileTheme(
+            textColor: const Color(0xFFEAF2FF),
+            iconColor: const Color(0xFFEAF2FF),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF33F0B0), Color(0xFF5B8DEF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x6633F0B0), blurRadius: 30),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Color(0xFF05100B),
+                        size: 42,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Relaxation',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Movies & Series',
+                      style: TextStyle(color: Color(0xFF91A1BC)),
+                    ),
+                    const SizedBox(height: 22),
+                    _DrawerInfoTile(
+                      icon: Icons.account_circle_rounded,
+                      label: 'User account',
+                      value: accountName,
+                    ),
+                    const SizedBox(height: 10),
+                    _DrawerInfoTile(
+                      icon: Icons.workspace_premium_rounded,
+                      label: 'Access',
+                      value: accessLabel,
+                    ),
+                    const SizedBox(height: 10),
+                    _DrawerInfoTile(
+                      icon: Icons.event_available_rounded,
+                      label: 'Expire date',
+                      value: expireDate,
+                    ),
+                    const SizedBox(height: 14),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.download_done_rounded,
+                        color: Color(0xFF33F0B0),
+                      ),
+                      title: const Text('Downloads'),
+                      subtitle: const Text(
+                        'Saved videos and active downloads',
+                        style: TextStyle(color: Color(0xFF91A1BC)),
+                      ),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const DownloadHistoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.support_agent_rounded,
+                        color: Color(0xFF33F0B0),
+                      ),
+                      title: const Text('Contact admin'),
+                      subtitle: const Text(
+                        'Support message: Relaxation',
+                        style: TextStyle(color: Color(0xFF91A1BC)),
+                      ),
+                      onTap: () => openAdminContact(),
+                    ),
+                    if (firebaseReady && user != null)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.logout_rounded),
+                        title: const Text('Logout'),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          accessService.signOut();
+                        },
+                      ),
+                    const Spacer(),
+                    const Divider(color: Color(0xFF263247)),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'App Version 1.0.0',
+                      style: TextStyle(
+                        color: Color(0xFF91A1BC),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: Color(0xFF05100B),
-                  size: 42,
-                ),
               ),
-              const SizedBox(height: 18),
-              const Text(
-                'Relaxation',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Movies & Series',
-                style: TextStyle(color: Color(0xFF91A1BC)),
-              ),
-              const SizedBox(height: 22),
-              _DrawerInfoTile(
-                icon: Icons.account_circle_rounded,
-                label: 'User account',
-                value:
-                    user?.email ??
-                    (firebaseReady ? 'Not signed in' : 'Demo mode'),
-              ),
-              const SizedBox(height: 10),
-              _DrawerInfoTile(
-                icon: Icons.event_available_rounded,
-                label: 'Expire date',
-                value: expireDate,
-              ),
-              const SizedBox(height: 14),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.download_done_rounded,
-                  color: Color(0xFF33F0B0),
-                ),
-                title: const Text('Downloads'),
-                subtitle: const Text(
-                  'Saved videos and active downloads',
-                  style: TextStyle(color: Color(0xFF91A1BC)),
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const DownloadHistoryScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.support_agent_rounded,
-                  color: Color(0xFF33F0B0),
-                ),
-                title: const Text('Contact admin'),
-                subtitle: const Text(
-                  'Support message: Relaxation',
-                  style: TextStyle(color: Color(0xFF91A1BC)),
-                ),
-                onTap: () => openAdminContact(),
-              ),
-              if (firebaseReady && user != null)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout_rounded),
-                  title: const Text('Logout'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    accessService.signOut();
-                  },
-                ),
-              const Spacer(),
-              const Divider(color: Color(0xFF263247)),
-              const SizedBox(height: 8),
-              const Text(
-                'App Version 1.0.0',
-                style: TextStyle(
-                  color: Color(0xFF91A1BC),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1070,97 +1168,127 @@ class _TopChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Builder(
-          builder: (context) {
-            return IconButton.filledTonal(
-              tooltip: 'Menu',
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              icon: const Icon(Icons.menu_rounded),
-            );
-          },
-        ),
-        const SizedBox(width: 10),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF33F0B0), Color(0xFF5B8DEF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: const [
-              BoxShadow(color: Color(0x4433F0B0), blurRadius: 22),
-            ],
-          ),
-          child: const Icon(
-            Icons.play_circle_fill_rounded,
-            color: Color(0xFF05100B),
-            size: 32,
-          ),
-        ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Relaxation',
-                style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                ),
-              ),
-              Text(
-                'Movies & Series',
-                style: TextStyle(color: Color(0xFF91A1BC), fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: firebaseReady
-                ? const Color(0x2233F0B0)
-                : const Color(0x22FFC857),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: firebaseReady
-                  ? const Color(0x6633F0B0)
-                  : const Color(0x66FFC857),
-            ),
-          ),
-          child: Icon(
-            firebaseReady ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-            color: firebaseReady
-                ? const Color(0xFF33F0B0)
-                : const Color(0xFFFFC857),
-          ),
-        ),
-        const SizedBox(width: 8),
-        ValueListenableBuilder<ThemeMode>(
-          valueListenable: appThemeMode,
-          builder: (context, mode, _) {
-            final dark = mode == ThemeMode.dark;
-            return IconButton.filledTonal(
-              tooltip: dark ? 'Light mode' : 'Dark mode',
-              onPressed: () {
-                appThemeMode.value = dark ? ThemeMode.light : ThemeMode.dark;
+        Row(
+          children: [
+            Builder(
+              builder: (context) {
+                return IconButton.filledTonal(
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  icon: const Icon(Icons.menu_rounded),
+                );
               },
-              icon: Icon(
-                dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            const Spacer(),
+            _ConnectionBadge(firebaseReady: firebaseReady),
+            const SizedBox(width: 8),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: appThemeMode,
+              builder: (context, mode, _) {
+                final dark = mode == ThemeMode.dark;
+                return IconButton.filledTonal(
+                  tooltip: dark ? 'Light mode' : 'Dark mode',
+                  onPressed: () {
+                    appThemeMode.value = dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark;
+                  },
+                  icon: Icon(
+                    dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(19),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF33F0B0), Color(0xFF5B8DEF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x4433F0B0), blurRadius: 22),
+                ],
               ),
-            );
-          },
+              child: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: Color(0xFF05100B),
+                size: 38,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Relaxation',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: colors.onSurface,
+                        fontSize: 31,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Movies & Series',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _ConnectionBadge extends StatelessWidget {
+  const _ConnectionBadge({required this.firebaseReady});
+
+  final bool firebaseReady;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = firebaseReady
+        ? Theme.of(context).colorScheme.primary
+        : const Color(0xFFFFC857);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .16),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: .38)),
+      ),
+      child: Icon(
+        firebaseReady ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+        color: color,
+      ),
     );
   }
 }

@@ -14,6 +14,8 @@ class AccessState {
     required this.licenseExpiresAt,
     required this.licenseKey,
     required this.disabled,
+    required this.telegramDisplayName,
+    required this.telegramPhone,
   });
 
   final String deviceHash;
@@ -21,6 +23,11 @@ class AccessState {
   final DateTime? licenseExpiresAt;
   final String licenseKey;
   final bool disabled;
+  final String telegramDisplayName;
+  final String telegramPhone;
+
+  bool get hasTelegramLogin =>
+      telegramDisplayName.trim().isNotEmpty || telegramPhone.trim().isNotEmpty;
 
   bool get hasAccess {
     if (disabled) return false;
@@ -365,6 +372,8 @@ class AccessService {
       licenseExpiresAt: _timestampToDate(data['licenseExpiresAt']),
       licenseKey: (data['licenseKey'] ?? '').toString(),
       disabled: data['disabled'] == true,
+      telegramDisplayName: (data['telegramDisplayName'] ?? '').toString(),
+      telegramPhone: (data['telegramPhone'] ?? '').toString(),
     );
   }
 }
